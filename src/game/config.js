@@ -7,5 +7,10 @@ export const DECISION_SCORE = 100;     // a correct scientific judgement call (d
 export const RESERVE = 240;            // after a second game over in the same chapter, refill to this (nobody gets stuck)
 export const GAMEOVER_SCORE = 100;
 export const REPEATS = 3;              // repeats per condition
-export const CHAPTERS = ['end'];          // run order; every id needs a module in main.js → CH
+export const CHAPTERS = ['race', 'end'];          // run order; every id needs a module in main.js → CH
 export const SAVE_KEY = 'stuntlab.v1';    // change per project (two labs on one origin must not share saves)
+
+export const START_DRILLS = 3;         // valid start-light reactions recorded in the race
+export const LIGHTS = { count: 5, stepMs: 700, holdMinMs: 800, holdMaxMs: 2500 };
+export const GHOST_SPEED = 14;         // m/s: Bumper's rival car in the qualifying lap
+export const WET_RUSH = 18;            // m/s: entering the wet corner faster than this arms the wet-corner lesson

@@ -15,8 +15,9 @@ import { CHAPTERS, SAVE_KEY, METER } from './game/config.js';
 import { createScope, Abort } from './chapters/kit.js';
 import { createDriveSession } from './core/driveSession.js';
 import * as chEnd from './chapters/ch_end.js';
+import * as chRace from './chapters/ch_race.js';
 
-const CH = { end: chEnd };
+const CH = { race: chRace, end: chEnd };
 const CH_NAMES = { race: 'מבחן הקבלה', strip: 'נסיעת מבחן', end: 'סיכום' };
 
 const params = new URLSearchParams(location.search);
@@ -153,7 +154,12 @@ function seedFor(id) {
 
 /** Teacher demo: a skipped chapter leaves the state as if played (results recorded from the same science model). */
 function skipFill(id) {
-  void id;
+  if (id === 'race') {
+    game.s.flags.view ??= 'table';
+    game.s.reaction ??= { simple: [0.28, 0.28, 0.28], falseStarts: 0 };
+    if (!game.s.reaction.simple.length) game.s.reaction.simple = [0.28, 0.28, 0.28];
+    game.s.flags.lapDone = true;
+  }
 }
 
 async function runChapter(id) {

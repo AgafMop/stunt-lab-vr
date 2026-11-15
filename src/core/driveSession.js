@@ -7,7 +7,8 @@ import { createDriveView } from './driveView.js';
 
 const ZERO = { throttle: 0, brake: 0, steer: 0, controllers: false };
 
-export function createDriveSession(ctx, { forced = false } = {}) {
+/** timeScale/maxSub: ?auto self-play runs the sim faster (more fixed steps per frame), never coarser. */
+export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub = 30 } = {}) {
   const { engine, lab } = ctx;
   const track = lab.track;
   const car3d = lab.makeCar(0xf07a1a);
@@ -21,11 +22,11 @@ export function createDriveSession(ctx, { forced = false } = {}) {
 
   const stepper = createStepper(h => {
     const surface = surfaceAt(track, car.x, car.z);
-    stepCar(car, frozen ? { throttle: 0, brake: 1, steer: 0 } : cur, h, surface);
+    stepCar(car, frozen ? { throttle: 0, brake: 1, steer: 0 } : driver ? driver(car) : cur, h, surface);
     car.offTrack = surface === 'sand' ? car.offTrack + h : 0;
     car.surface = surface;
     for (const fn of stepListeners) fn(car, h);
-  });
+  }, 1 / 120, maxSub);
 
   async function doRespawn() {
     respawning = true;
@@ -39,8 +40,8 @@ export function createDriveSession(ctx, { forced = false } = {}) {
 
   const offFrame = engine.onFrame(dt => {
     if (!running) return;
-    cur = driver ? driver(car) : input.read();
-    stepper(dt);
+    cur = input.read();
+    stepper(dt * timeScale);
     view.update(car, dt);
     if (car.offTrack >= OFFTRACK_RESPAWN_S && !respawning) doRespawn();
   });

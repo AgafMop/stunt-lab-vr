@@ -13,3 +13,6 @@ intro/clips/
 
 # local tooling, not part of the site
 .claude/
+
+# raw Gemini/Veo output (big); only the edited film is committed
+assets/film/raw/

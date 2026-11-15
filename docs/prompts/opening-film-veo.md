@@ -9,7 +9,7 @@
 
 קליפים 1, 4, 8 הם בלי דמויות, ולכן נוצרים ישר כסרטון (חוסך מכסה).
 
-**שמירה:** כל קובץ נשמר בשם שכתוב בצעד, בתיקייה `assets/film/raw/` בפרויקט. **מכסות:** הסדר בנוי לפי עדיפות. אם נגמרה המכסה היומית, ממשיכים מחר מאותו צעד. גם אם יש רק חלק מהקליפים, אפשר לערוך מהם סרטון קצר יותר.
+**שמירה:** כל קובץ נשמר בשם שכתוב בצעד, בתיקייה `assets/film/raw/` בפרויקט (ג'מיני שומר תמונות כ-jpg, וזה בסדר: `sheet-car.jpg` במקום `.png`). **מכסות:** הסדר בנוי לפי עדיפות. אם נגמרה המכסה היומית, ממשיכים מחר מאותו צעד. גם אם יש רק חלק מהקליפים, אפשר לערוך מהם סרטון קצר יותר.
 
 ---
 
@@ -45,7 +45,7 @@ Create a vehicle design sheet on a plain light-grey background showing the same 
 
 **צעד 5 · תמונה · לצרף: `sheet-dana.png` + `sheet-roni.png` + `sheet-bumper.png` · שמור: `frame-09.png`**
 ```
-Using the three attached character sheets for the exact look of the characters, create one single widescreen 16:9 cinematic still: an empty wooden folding director's chair with a blank canvas back stands on a raised wooden tower platform, with a clipboard resting on its seat. Behind the chair, below the tower, a straight asphalt road runs to a cliff edge in a red desert canyon at sunset. Around the chair, a few meters away, stand the film director with the cap, sunglasses and red megaphone, the stunt driver in the deep-red racing suit and mirrored-visor helmet, and the white crash-test robot with the cyan cartoon-eye screen face, all looking toward the chair. Warm golden-hour light, orange and violet sky, long shadows, soft dust in the air. Stylized 3D animated feature film look, clean shapes, slightly exaggerated proportions, cinematic anamorphic framing, shallow depth of field. No visible human faces. No text, no letters, no logos, no watermarks.
+Using the three attached character sheets for the exact look of the characters, create one single widescreen 16:9 cinematic still: an empty wooden folding director's chair with a blank canvas back stands on a raised wooden tower platform, with a clipboard resting on its seat. Behind the chair, below the tower, a straight asphalt road runs to a cliff edge in a red desert canyon at sunset. Around the chair, a few meters away, stand the film director, dressed exactly as in her sheet (olive cap, dark sunglasses, olive utility vest over a light-blue shirt, dark cargo pants, red megaphone in her hand), seen from behind; the stunt driver in the deep-red racing suit, wearing her single mirrored-visor helmet on her head, hands empty; and the white crash-test robot with the cyan cartoon-eye screen face; all looking toward the chair. Warm golden-hour light, orange and violet sky, long shadows, soft dust in the air. Stylized 3D animated feature film look, clean shapes, slightly exaggerated proportions, cinematic anamorphic framing, shallow depth of field. The image fills the whole frame, no black bars. No visible human faces. No text, no letters, no logos, no watermarks.
 ```
 
 **צעד 6 · סרטון · לצרף: `frame-09.png` · שמור: `clip-09.mp4`**

@@ -7,9 +7,9 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:8080',
+    baseURL: 'http://localhost:8081',
     viewport: { width: 1280, height: 720 },
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
   },
-  webServer: { command: 'npx http-server -p 8080 -c-1 -s .', port: 8080, reuseExistingServer: true, timeout: 60_000 },
+  webServer: { command: 'npx http-server -p 8081 -c-1 -s .', port: 8081, reuseExistingServer: true, timeout: 60_000 },
 });

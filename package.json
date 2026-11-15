@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test \"tests/*.test.js\"",
     "e2e": "playwright test",
-    "serve": "http-server -p 8080 -c-1 ."
+    "serve": "http-server -p 8081 -c-1 ."
   },
   "devDependencies": {
     "@gltf-transform/cli": "^4.5.1",

@@ -1,0 +1,12 @@
+node_modules/
+test-results/
+playwright-report/
+blender/cache/
+__pycache__/
+*.blend1
+.superpowers/
+# generated film clips (big, regenerable) — the built assets/intro.mp4 is committed
+intro/clips/
+.superpowers/
+*.doc
+*.docx

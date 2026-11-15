@@ -8,7 +8,7 @@ import { createInput } from './core/input.js';
 import { createLocomotion } from './core/locomotion.js';
 import { createUI } from './core/ui3d.js';
 import { createAudio } from './core/audio.js';
-import { loadLab } from './lab/labScene.js';
+import { loadStuntSet } from './lab/stuntScene.js';
 import { createGame } from './game/state.js';
 import { createStorage } from './game/storage.js';
 import { CHAPTERS, SAVE_KEY, METER } from './game/config.js';
@@ -89,11 +89,10 @@ if (TEST && params.has('tour')) {
 const $ = id => document.getElementById(id);
 
 async function boot() {
-  ctx.lab = await loadLab(engine);
-  for (const [n, o] of Object.entries(ctx.lab.props)) ctx.track?.(o, n);
-  ctx.loco = createLocomotion(engine, input, { room: { x0: -3.4, x1: 3.4, z0: -2.6, z1: 2.6 }, blocks: [[-0.95, 0.95, -1.8, -1.0]] });
-  for (const id of ['bench', 'entry']) if (ctx.lab.stationNodes[id]) ctx.loco.addStation(id, ctx.lab.stationNodes[id], ctx.lab.discs[id]);
-  await ctx.loco.goTo('bench', { fade: false });
+  ctx.lab = await loadStuntSet(engine);
+  ctx.loco = createLocomotion(engine, input, { room: { x0: -1.7, x1: 1.7, z0: -1.7, z1: 1.7 }, blocks: [[-0.7, 0.7, -0.75, -0.15]] });
+  for (const id of ['tower', 'pit']) if (ctx.lab.stationNodes[id]) ctx.loco.addStation(id, ctx.lab.stationNodes[id], ctx.lab.discs[id]);
+  await ctx.loco.goTo('tower', { fade: false });
   await ui.fontsReady;
   $('enter').disabled = false; $('enter').textContent = 'כניסה במחשב';
   if (saved?.chapter && CH[saved.chapter] && saved.chapter !== CHAPTERS[0]) {
@@ -131,7 +130,6 @@ async function runGame() {
   if (!only && saved?.chapter && CH[saved.chapter] && game.loadSave()) {
     list = list.slice(list.indexOf(saved.chapter));
     game.spend(0);                // refresh the meter with the saved value
-    if (game.s.flags.goggles) ctx.lab.props.P_goggles.visible = false;
   }
   if (only) seedFor(only);
   for (const id of list) await runChapter(id);

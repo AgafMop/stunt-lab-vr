@@ -11,6 +11,7 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
   const { rig, camera, renderer } = engine;
   const stations = {};
   let current = null, smooth = false, turnLatch = false, yaw = 0, pitch = -0.12;
+  let baseY = 0, seatOff = 0;           // station floor height (a tower deck) + seated calibration
   const offset = new THREE.Vector3();   // cinematic worlds (enzyme zoom, intro) live at an offset from the lab
   const keys = new Set();
   const v = new THREE.Vector3(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -32,12 +33,14 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
     const off = new THREE.Vector3(h.x, 0, h.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), rigYaw);
     rig.position.x = pos.x - off.x + offset.x;
     rig.position.z = pos.z - off.z + offset.z;
+    baseY = pos.y;
+    rig.position.y = baseY + (engine.isXR() ? seatOff : 0) + offset.y;
     if (!engine.isXR()) { yaw = 0; camera.rotation.set(pitch, 0, 0); }
   }
 
   function calibrateHeight() {
     const h = headLocal();
-    if (h.y) rig.position.y = seatedRigOffset(h.y) + offset.y;
+    if (h.y) { seatOff = seatedRigOffset(h.y); rig.position.y = baseY + seatOff + offset.y; }
   }
 
   const loco = {
@@ -45,7 +48,7 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
     get current() { return current; },
     addStation(id, node, disc) {
       const p = node.getWorldPosition(new THREE.Vector3());
-      stations[id] = { pos: p, yaw: node.userData.yaw ?? 0, disc };
+      stations[id] = { pos: p, yaw: node.userData.yaw ?? 0, pitch: node.userData.pitch, disc };
       if (!order.includes(id)) order.push(id);
       if (disc) input.register(disc, { onSelect: () => loco.goTo(id), noHighlight: false });
     },
@@ -57,6 +60,7 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
       const s = stations[id];
       if (!s) throw new Error(`no station ${id}`);
       if (fade) await engine.fade(1, 180);
+      if (s.pitch != null && !engine.isXR()) pitch = s.pitch;
       place(s.pos, s.yaw);
       current = id;
       for (const [k, st] of Object.entries(stations)) if (st.disc) st.disc.visible = k !== id;
@@ -76,7 +80,7 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
     let n = 0;
     const off = engine.onFrame(() => { if (++n === 30) { off(); loco.recenter(); } });
   });
-  renderer.xr.addEventListener('sessionend', () => { rig.position.y = offset.y; camera.position.set(0, DESK_EYE, 0); });
+  renderer.xr.addEventListener('sessionend', () => { rig.position.y = offset.y + baseY; camera.position.set(0, DESK_EYE, 0); });
 
   // ---- desktop controls ----
   const canvas = renderer.domElement;

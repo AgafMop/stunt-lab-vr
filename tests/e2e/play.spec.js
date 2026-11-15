@@ -21,15 +21,15 @@ const textProblems = page => page.evaluate(() => window.__ctx.ui.textAudit.map(v
 test('boots and teleports between stations', async ({ page }) => {
   const errors = await boot(page, '&nogame');
   await page.waitForTimeout(800);
-  await page.screenshot({ path: `${SHOTS}/bench.png` });
-  await page.evaluate(() => window.__ctx.loco.goTo('entry'));
+  await page.screenshot({ path: `${SHOTS}/tower.png` });
+  await page.evaluate(() => window.__ctx.loco.goTo('pit'));
   const d = await page.evaluate(() => {
     const { engine, loco } = window.__ctx;
-    const head = engine.headPosition(), s = loco.stations.entry.pos;
+    const head = engine.headPosition(), s = loco.stations.pit.pos;
     return Math.hypot(head.x - s.x, head.z - s.z);
   });
   expect(d).toBeLessThan(0.3);
-  await page.screenshot({ path: `${SHOTS}/entry.png` });
+  await page.screenshot({ path: `${SHOTS}/pit.png` });
   expect(errors).toEqual([]);
 });
 

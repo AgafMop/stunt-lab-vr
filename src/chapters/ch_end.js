@@ -5,7 +5,7 @@ export async function run(ctx, scope) {
   const { ui, game, audio } = ctx;
   const { score, stars, badges } = game.finalScore();
   audio.sfx('win');
-  const g = boardAtStation(ctx, scope, 'bench', { dist: 1.1, height: 1.3 });
+  const g = boardAtStation(ctx, scope, 'tower', { dist: 1.1, height: 1.3 });
   const p = scope.add(ui.panel({ w: 0.8, h: 0.45, name: 'end', viewDist: 1.1, draw(c, W, H) {
     ui.rr(c, 6, 6, W - 12, H - 12, 30); c.fillStyle = ui.C.bg; c.fill(); c.lineWidth = 6; c.strokeStyle = ui.C.oxy; c.stroke();
     c.fillStyle = '#FFD166'; ui.fitText(c, '★'.repeat(stars) + '☆'.repeat(3 - stars), { x: 30, y: 20, w: W - 60, h: H * 0.28, maxPx: H * 0.22, minPx: ui.minPx(900, 1.1), font: ui.FONT });

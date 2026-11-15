@@ -68,6 +68,8 @@ export async function run(ctx, scope) {
       game.s.reaction.simple.push(res.reaction);
       ctx.audio.sfx('ok');
       showTimes(game.s.reaction.simple);
+    } else if (res.kind === 'none') {
+      await scope.say('race_lights');
     } else {
       game.s.reaction.falseStarts++;
       ctx.audio.sfx('no');
@@ -148,7 +150,7 @@ function startDrill(ctx, scope, drive, lights, rng, forceFalse) {
       lightsOutSeen.done = true;
       if (ctx.auto) { finish(classifyStart(lightsOut + AUTO_REACTION_MS, lightsOut, false)); return; }
       if (held) finish(classifyStart(lightsOut + (now - lightsOut) * speed, lightsOut, false));
-      else if (now - lightsOut > 3000) finish({ kind: 'false', reaction: null });   // no press: just try again
+      else if (now - lightsOut > 3000) finish({ kind: 'none', reaction: null });    // no press: not a false start, just try again
     });
     const lightsOutSeen = { done: false };
     function finish(r) { finished = true; off(); res(r); }

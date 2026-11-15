@@ -14,10 +14,12 @@ import { createStorage } from './game/storage.js';
 import { CHAPTERS, SAVE_KEY, METER } from './game/config.js';
 import { createScope, Abort } from './chapters/kit.js';
 import { createDriveSession } from './core/driveSession.js';
+import { sampleRun, makeRng } from './game/model.js';
 import * as chEnd from './chapters/ch_end.js';
 import * as chRace from './chapters/ch_race.js';
+import * as chStrip from './chapters/ch_strip.js';
 
-const CH = { race: chRace, end: chEnd };
+const CH = { race: chRace, strip: chStrip, end: chEnd };
 const CH_NAMES = { race: 'מבחן הקבלה', strip: 'נסיעת מבחן', end: 'סיכום' };
 
 const params = new URLSearchParams(location.search);
@@ -159,6 +161,11 @@ function skipFill(id) {
     game.s.reaction ??= { simple: [0.28, 0.28, 0.28], falseStarts: 0 };
     if (!game.s.reaction.simple.length) game.s.reaction.simple = [0.28, 0.28, 0.28];
     game.s.flags.lapDone = true;
+  }
+  if (id === 'strip' && !Object.keys(game.s.trials).length) {
+    const r = sampleRun(60, 'dry', makeRng(game.s.seed * 31 + 8));
+    game.addTrial(r.kmh, { value: r.distance, kmh: r.kmh, target: 60, by: 'student' }, { free: true });
+    game.s.flags.rodeAlong ??= false;
   }
 }
 

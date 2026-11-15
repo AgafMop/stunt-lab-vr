@@ -88,7 +88,7 @@ export async function loadStuntSet(engine) {
   const desk = mesh(tower, new THREE.BoxGeometry(1.2, 0.05, 0.3), mat(0x6b4f36), [0, DECK_Y + 0.62, -1.7], 'desk');   // narrow & low: never hides the strip
   void desk;
   empty(root, 'ST_tower', [0, DECK_Y, -1.4], 0).userData.pitch = -0.42;   // desktop: look down at the strip
-  empty(root, 'A_board', [0, DECK_Y + 1.3, -2.6], 0);
+  empty(root, 'A_board', [0, DECK_Y + 1.02, -2.6], 0);
   empty(root, 'A_radar', [-0.9, DECK_Y + 1.15, -2.4], 0);
   empty(root, 'A_clapper', [0.35, DECK_Y + 0.65, -1.7]);
   empty(root, 'A_table', [0, DECK_Y + 0.35, -2.9]);

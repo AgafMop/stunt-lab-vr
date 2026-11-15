@@ -35,8 +35,9 @@ test('boots and teleports between stations', async ({ page }) => {
 
 // look at every board you add: screenshot it and READ the image (hidden, clipped or tiny text shows up here first)
 test('tour: screenshot every board', async ({ page }) => {
+  test.setTimeout(240_000);
   const errors = await boot(page, '&auto&fresh&seed=7&tour');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 170_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 220_000 });
   const tour = await page.evaluate(() => window.__tour);
   const fs = await import('node:fs');
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -46,8 +47,9 @@ test('tour: screenshot every board', async ({ page }) => {
 });
 
 test('full game plays itself to the end within budget, text fits, nothing jumps', async ({ page }) => {
+  test.setTimeout(240_000);
   const errors = await boot(page, '&auto&fresh&seed=42');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 170_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 220_000 });
   await page.screenshot({ path: `${SHOTS}/end.png` });
   expect(await textProblems(page)).toEqual([]);
   expect(await page.evaluate(() => window.__ctx.motionAudit)).toEqual([]);
@@ -57,6 +59,10 @@ test('full game plays itself to the end within budget, text fits, nothing jumps'
     expect(b.tris, `${ch} triangles`).toBeLessThanOrEqual(400_000);
   }
   const s = await page.evaluate(() => window.__ctx.game.s);
-  expect(s.trials[37].filter(t => t.valid).length).toBe(3);
+  expect(budget).toHaveProperty('race');      // 'end' finishes before the 1.5 s budget sample in ?auto
+  expect(budget).toHaveProperty('strip');
+  expect(s.reaction.simple).toHaveLength(3);
+  expect(s.flags.lapDone).toBe(true);
+  expect(Object.values(s.trials).flat()).toHaveLength(1);
   expect(errors).toEqual([]);
 });

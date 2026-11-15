@@ -178,8 +178,8 @@ export function makeCar(color = 0xf07a1a) {
   car.add(new THREE.Mesh(mergeGeometries(wheels), mat(0x151515)));
   const seat = new THREE.Object3D(); seat.name = 'seat'; seat.position.set(0.38, 1.12, -0.35); car.add(seat);
   const seatP = new THREE.Object3D(); seatP.name = 'seatP'; seatP.position.set(-0.38, 1.12, -0.35); car.add(seatP);
-  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.022, 8, 28), mat(0x111111, 0.5)); wheel.name = 'wheel';
-  wheel.position.set(0.38, 0.92, 0.05); wheel.rotation.x = -0.35; car.add(wheel);   // faces the driver (-z side)
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.018, 8, 28), mat(0x111111, 0.5)); wheel.name = 'wheel';
+  wheel.position.set(0.38, 0.8, 0.1); wheel.rotation.x = -0.45; car.add(wheel);   // faces the driver (-z side)
   const front = new THREE.Object3D(); front.name = 'frontWheel'; front.position.set(0, 0, 1.35); car.add(front);
   return car;
 }

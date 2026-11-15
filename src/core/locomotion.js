@@ -12,6 +12,10 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
   const stations = {};
   let current = null, smooth = false, turnLatch = false, yaw = 0, pitch = -0.12;
   let baseY = 0, seatOff = 0;           // station floor height (a tower deck) + seated calibration
+  // follow mode (riding in a car): the rig carries the student's calibrated head to an eye pose every frame — yaw only,
+  // never roll or pitch. locked: desktop WASD / digit keys and XR snap turn are off (the controls drive the car).
+  let followFn = null, locked = false, lookYaw = 0, calib = { x: 0, y: DESK_EYE, z: 0, yaw: 0 };
+  const UP = new THREE.Vector3(0, 1, 0), tmpOff = new THREE.Vector3();
   const offset = new THREE.Vector3();   // cinematic worlds (enzyme zoom, intro) live at an offset from the lab
   const keys = new Set();
   const v = new THREE.Vector3(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -68,13 +72,41 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
     },
     recenter() {
       calibrateHeight();
+      if (followFn) { captureCalib(); loco.applyFollow(); return; }
       if (current) place(stations[current].pos, stations[current].yaw);
     },
     setSmooth(on) { smooth = on; },
     /** Walkable bounds for desktop WASD / smooth move (null = the lab). */
     setArea(a) { area = a; },
     get smooth() { return smooth; },
+    lock(v) { locked = v; },
+    /** Desktop look pitch (rad); ignored in XR. */
+    setPitch(p) { if (!engine.isXR()) pitch = p; },
+    get locked() { return locked; },
+    /** fn() → { pos: Vector3 (eye, world), yaw } or null to stop following. */
+    follow(fn) { followFn = fn; lookYaw = 0; if (fn) { captureCalib(); loco.applyFollow(); } },
+    get following() { return !!followFn; },
+    /** Place the rig for the current follow pose now (call right after moving the followed object: no one-frame lag). */
+    applyFollow() {
+      if (!followFn) return;
+      const { pos, yaw: fy } = followFn();
+      if (!engine.isXR()) {
+        rig.rotation.set(0, fy, 0);
+        rig.position.set(pos.x, pos.y - DESK_EYE, pos.z);
+        camera.rotation.set(pitch, lookYaw, 0);
+        return;
+      }
+      const ry = fy - calib.yaw;
+      rig.rotation.set(0, ry, 0);
+      tmpOff.set(calib.x, 0, calib.z).applyAxisAngle(UP, ry);
+      rig.position.set(pos.x - tmpOff.x, pos.y - calib.y, pos.z - tmpOff.z);
+    },
   };
+
+  function captureCalib() {
+    const h = headLocal();
+    calib = engine.isXR() && h.y ? { x: h.x, y: h.y, z: h.z, yaw: h.yaw } : { x: 0, y: DESK_EYE, z: 0, yaw: 0 };
+  }
 
   renderer.xr.addEventListener('sessionstart', () => {
     let n = 0;
@@ -87,7 +119,7 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
   addEventListener('keydown', ev => {
     keys.add(ev.code);
     const n = /^Digit[1-9]$/.test(ev.code) ? order[Number(ev.code.slice(5)) - 1] : null;
-    if (n && stations[n] && !engine.isXR() && !area) loco.goTo(n);   // lab hotkeys only inside the lab
+    if (n && stations[n] && !engine.isXR() && !area && !locked) loco.goTo(n);   // lab hotkeys only inside the lab
   });
   addEventListener('keyup', ev => keys.delete(ev.code));
   canvas.addEventListener('dblclick', () => { if (!engine.isXR() && canvas.requestPointerLock) canvas.requestPointerLock(); });
@@ -99,7 +131,8 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
     let dx = 0, dy = 0;
     if (input.mouse.locked) { dx = ev.movementX; dy = ev.movementY; }
     else if (drag && ev.buttons && !input.mouse.grabbed && !input.mouse.pending) { dx = ev.clientX - drag.x; dy = ev.clientY - drag.y; drag.x = ev.clientX; drag.y = ev.clientY; }   // dragging a prop never turns the view
-    yaw -= dx * 0.0035; pitch = Math.max(-1.2, Math.min(1.1, pitch - dy * 0.0035));
+    if (followFn) lookYaw -= dx * 0.0035; else yaw -= dx * 0.0035;
+    pitch = Math.max(-1.2, Math.min(1.1, pitch - dy * 0.0035));
   });
 
   let area = null;   // null = the lab; otherwise {x0,x1,z0,z1,blocks}
@@ -115,13 +148,14 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
   }
 
   engine.onFrame(dt => {
+    if (followFn) { loco.applyFollow(); return; }
     if (!engine.isXR()) {
       rig.rotation.y += yaw; yaw = 0;
       if (offset.lengthSq() > 0) { camera.rotation.set(pitch, 0, 0); return; }
       camera.rotation.set(pitch, 0, 0);
       const f = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
       const s = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
-      if (f || s) {
+      if ((f || s) && !locked) {
         const a = rig.rotation.y, sp = 1.6 * dt;
         move((-Math.sin(a) * f + Math.cos(a) * s) * sp, (-Math.cos(a) * f - Math.sin(a) * s) * sp);
       }
@@ -133,7 +167,7 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
       const gp = src.gamepad; if (!gp || gp.axes.length < 4) continue;
       const ax = gp.axes[2], ay = gp.axes[3];
       if (src.handedness === 'right') {
-        if (!turnLatch && Math.abs(ax) > 0.7) {
+        if (!locked && !turnLatch && Math.abs(ax) > 0.7) {
           turnLatch = true;
           const head = engine.headPosition(new THREE.Vector3());
           const ang = -Math.sign(ax) * Math.PI / 6;
@@ -142,7 +176,7 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
         } else if (Math.abs(ax) < 0.3) turnLatch = false;
         if (gp.buttons[3]?.pressed && !loco.__rc) { loco.__rc = true; loco.recenter(); }
         if (!gp.buttons[3]?.pressed) loco.__rc = false;
-      } else if (src.handedness === 'left' && smooth && (Math.abs(ax) > 0.15 || Math.abs(ay) > 0.15)) {
+      } else if (src.handedness === 'left' && smooth && !locked && (Math.abs(ax) > 0.15 || Math.abs(ay) > 0.15)) {
         const h = new THREE.Euler().setFromQuaternion(camera.getWorldQuaternion(q), 'YXZ').y;
         const sp = 1.4 * dt;
         move((Math.cos(h) * ax + Math.sin(h) * ay) * sp, (-Math.sin(h) * ax + Math.cos(h) * ay) * sp);

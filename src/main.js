@@ -13,6 +13,7 @@ import { createGame } from './game/state.js';
 import { createStorage } from './game/storage.js';
 import { CHAPTERS, SAVE_KEY, METER } from './game/config.js';
 import { createScope, Abort } from './chapters/kit.js';
+import { createDriveSession } from './core/driveSession.js';
 import * as chEnd from './chapters/ch_end.js';
 
 const CH = { end: chEnd };
@@ -121,7 +122,16 @@ async function start(vr) {
   ui.wristMeter(game, { label: METER.label, max: METER.start, low: METER.low });
   ctx.ready = true;
   if (params.has('nogame')) return;
+  if (params.get('fx') === 'drive') { driveSandbox().catch(err => console.error(err)); return; }
   runGame().catch(err => console.error(err));
+}
+
+/** ?fx=drive — drive the race car freely (no chapter). ?ride=off locks the tabletop view; otherwise start in the cockpit. */
+async function driveSandbox() {
+  const forced = params.get('ride') === 'off';
+  ctx.drive = createDriveSession(ctx, { forced });
+  await ctx.drive.view.setMode(forced ? 'table' : 'cockpit');
+  ctx.drive.start();
 }
 
 async function runGame() {

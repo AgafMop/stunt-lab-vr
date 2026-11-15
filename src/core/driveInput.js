@@ -57,6 +57,11 @@ export function createDriveInput(engine, input, { car3d }) {
 
   return {
     read,
+    /** In the headset: is at least one tracked controller with a gamepad present? (hand tracking alone = false) */
+    hasControllers() {
+      if (!engine.renderer.xr.getSession?.()) return false;
+      return input.pointers.some(p => p.source?.gamepad && !p.source.hand && (p.handedness === 'left' || p.handedness === 'right'));
+    },
     /** Gas pressed right now (start lights): right trigger, W/↑ or Space. */
     gasHeld() {
       const session = engine.renderer.xr.getSession?.();

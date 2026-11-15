@@ -15,6 +15,7 @@ const d = (text, say) => ({ speaker: 'dana', text, ...(say ? { say } : {}) });
 export const LINES = {
   // race (chapter 1)
   race_choose: b('איך נוהגים היום? מתוך הרכב, או בשלט מהמגדל?'),
+  race_controllers: b('כדי לנהוג צריך את הבקרים. הרימו אותם, אחד בכל יד.'),
   race_lights: b('חמישה אורות אדומים. כשכולם כבים — גז!'),
   race_falsestart: b('זינוק מוקדם! תגובה לפני האות היא ניחוש, לא זמן תגובה.'),
   race_go: d('מבחן קבלה. הקפה אחת. תראו לי מה אתם שווים.'),

@@ -148,7 +148,7 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
   }
 
   engine.onFrame(dt => {
-    if (followFn) { loco.applyFollow(); return; }
+    if (followFn) { loco.applyFollow(); if (!engine.isXR()) return; }   // XR: keep reading the recenter button while riding
     if (!engine.isXR()) {
       rig.rotation.y += yaw; yaw = 0;
       if (offset.lengthSq() > 0) { camera.rotation.set(pitch, 0, 0); return; }

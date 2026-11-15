@@ -60,6 +60,8 @@ export async function run(ctx, scope) {
     await engine.fade(1, 200);
     loco.lock(true); loco.setPitch(-0.08);
     loco.follow(() => ({ pos: seatP.getWorldPosition(eye), yaw: car.rotation.y + Math.PI }));
+    // an abort (teacher skip / game over) mid-ride must never leave the student riding a removed car
+    scope.add(() => { if (loco.following) { loco.follow(null); loco.goTo('tower', { fade: false }); } loco.lock(false); });
     await engine.fade(0, 250);
   }
   const rigStart = engine.rig.position.clone();

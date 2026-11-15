@@ -56,3 +56,24 @@ test('strip: reading screenshot (radar + drone zoom)', async ({ page }) => {
   await page.waitForTimeout(1000);
   await page.screenshot({ path: 'test-results/shots/ruler-read.png' });
 });
+
+test('strip: a teacher skip during the ride-along leaves the student back in the tower, free to move', async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('/?test&only=strip&auto&fresh&seed=42&animspeed=1&ride=on&demo');
+  await expect(page.locator('#enter')).toBeEnabled({ timeout: 100_000 });
+  await page.click('#enter');
+  await page.waitForFunction(() => window.__ctx?.loco.following === true, null, { timeout: 100_000 });
+  await page.evaluate(() => window.__ctx.demoSkip());
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 60_000 });
+  const s = await page.evaluate(() => {
+    const { engine, loco } = window.__ctx;
+    const h = engine.headPosition(), t = loco.stations.tower.pos;
+    return { following: loco.following, locked: loco.locked, d: Math.hypot(h.x - t.x, h.z - t.z) };
+  });
+  expect(s.following).toBe(false);
+  expect(s.locked).toBe(false);
+  expect(s.d).toBeLessThan(0.3);
+  expect(errors).toEqual([]);
+});

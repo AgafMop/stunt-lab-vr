@@ -53,3 +53,15 @@ for (const ride of ['on', 'off']) {
     await page.screenshot({ path: `test-results/shots/lights-${ride === 'on' ? 'cockpit' : 'table'}.png` });
   });
 }
+
+test('race: in the headset without controllers (hand tracking) the student is told to pick them up', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('/?test&only=race&auto&fresh&seed=42&ride=off&nocontrollers');
+  await expect(page.locator('#enter')).toBeEnabled({ timeout: 100_000 });
+  await page.click('#enter');
+  await page.waitForFunction(() => document.getElementById('sub')?.textContent.includes('בקרים'), null, { timeout: 60_000 });
+  expect(await page.evaluate(() => window.__ctx.game.s.reaction.simple.length)).toBe(0);   // no drill runs without controllers
+  expect(errors).toEqual([]);
+});

@@ -21,7 +21,12 @@ export async function run(ctx, scope) {
     timeScale: ctx.auto ? ctx.animSpeed : 1, maxSub: ctx.auto ? 400 : 30,
   });
   ctx.drive = drive;
-  scope.add(() => { drive.dispose(); ctx.drive = null; });
+  scope.add(() => {                                   // also on abort: back to the tower, nothing left following/locked
+    const wasRiding = ctx.loco.following;
+    drive.dispose(); ctx.drive = null;
+    if (wasRiding) ctx.loco.goTo('tower', { fade: false });
+    ctx.loco.lock(false);
+  });
 
   // ---- 1. view choice ----
   let view = ride === 'off' ? 'table' : ride === 'on' ? 'cockpit' : null;
@@ -60,8 +65,17 @@ export async function run(ctx, scope) {
   game.s.reaction = { simple: [], falseStarts: 0 };
   const rng = makeRng(game.s.seed * 13 + 5);
   let forceFalse = params.has('forcefalse');
+  // driving needs controllers: in the headset with hand tracking only, ask for them and wait (?nocontrollers simulates it)
+  const noControllers = () => params.has('nocontrollers') || (engine.isXR() && !drive.input.hasControllers());
+  const ensureControllers = async () => {
+    if (!noControllers()) return;
+    await scope.say('race_controllers');
+    while (noControllers()) { await scope.wait(500); if (noControllers()) await scope.say('race_controllers'); }
+  };
+  await ensureControllers();
   await scope.say('race_lights');
   while (game.s.reaction.simple.length < START_DRILLS) {
+    await ensureControllers();
     const res = await scope.guard(startDrill(ctx, scope, drive, lights, rng, forceFalse));
     forceFalse = false;
     if (res.kind === 'ok') {

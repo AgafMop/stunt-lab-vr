@@ -13,12 +13,10 @@ import { createGame } from './game/state.js';
 import { createStorage } from './game/storage.js';
 import { CHAPTERS, SAVE_KEY, METER } from './game/config.js';
 import { createScope, Abort } from './chapters/kit.js';
-import * as chBriefing from './chapters/ch_briefing.js';
-import * as chBench from './chapters/ch_bench.js';
 import * as chEnd from './chapters/ch_end.js';
 
-const CH = { briefing: chBriefing, bench: chBench, end: chEnd };
-const CH_NAMES = { briefing: 'תדריך והשערה', bench: 'הניסוי בידיים', end: 'סיכום' };
+const CH = { end: chEnd };
+const CH_NAMES = { race: 'מבחן הקבלה', strip: 'נסיעת מבחן', end: 'סיכום' };
 
 const params = new URLSearchParams(location.search);
 const TEST = params.has('test');
@@ -142,15 +140,12 @@ async function runGame() {
 
 /** State a chapter expects when run alone (?only=<id>) — keep in step with skipFill. */
 function seedFor(id) {
-  const order = CHAPTERS.indexOf(id);
-  if (order > CHAPTERS.indexOf('briefing')) game.s.hypothesis ??= 'peak';
-  if (order > CHAPTERS.indexOf('bench')) { game.s.flags.goggles = true; skipFill('bench'); }
+  void id;
 }
 
 /** Teacher demo: a skipped chapter leaves the state as if played (results recorded from the same science model). */
 function skipFill(id) {
-  if (id === 'briefing') game.s.hypothesis ??= 'peak';
-  if (id === 'bench') { game.s.flags.goggles = true; if (!game.s.trials[37]?.length) [36, 37.5, 36.5].forEach(v => game.addTrial(37, { value: v, by: 'student' }, { free: true })); }
+  void id;
 }
 
 async function runChapter(id) {

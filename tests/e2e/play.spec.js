@@ -34,16 +34,6 @@ test('boots and teleports between stations', async ({ page }) => {
 });
 
 // look at every board you add: screenshot it and READ the image (hidden, clipped or tiny text shows up here first)
-test('hypothesis board shows three picture cards in front of the student', async ({ page }) => {
-  const errors = await boot(page, '&only=briefing&fresh');
-  await page.waitForFunction(() => window.__ctx.ui.textAudit && document.getElementById('sub')?.textContent.includes('גרף'), null, { timeout: 60_000 });
-  await page.waitForTimeout(600);
-  await page.screenshot({ path: `${SHOTS}/hypothesis.png` });
-  expect(await textProblems(page)).toEqual([]);
-  expect(errors).toEqual([]);
-});
-
-// ?tour: one screenshot per board across the whole game → test-results/shots/tour-NN.jpg (then read them)
 test('tour: screenshot every board', async ({ page }) => {
   const errors = await boot(page, '&auto&fresh&seed=7&tour');
   await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 170_000 });

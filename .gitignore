@@ -10,3 +10,6 @@ intro/clips/
 .superpowers/
 *.doc
 *.docx
+
+# local tooling, not part of the site
+.claude/

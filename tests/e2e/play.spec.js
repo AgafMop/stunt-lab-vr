@@ -35,9 +35,9 @@ test('boots and teleports between stations', async ({ page }) => {
 
 // look at every board you add: screenshot it and READ the image (hidden, clipped or tiny text shows up here first)
 test('tour: screenshot every board', async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(330_000);
   const errors = await boot(page, '&auto&fresh&seed=7&tour');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 220_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 320_000 });
   const tour = await page.evaluate(() => window.__tour);
   const fs = await import('node:fs');
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -47,9 +47,9 @@ test('tour: screenshot every board', async ({ page }) => {
 });
 
 test('full game plays itself to the end within budget, text fits, nothing jumps', async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(330_000);
   const errors = await boot(page, '&auto&fresh&seed=42');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 220_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 320_000 });
   await page.screenshot({ path: `${SHOTS}/end.png` });
   expect(await textProblems(page)).toEqual([]);
   expect(await page.evaluate(() => window.__ctx.motionAudit)).toEqual([]);
@@ -60,9 +60,14 @@ test('full game plays itself to the end within budget, text fits, nothing jumps'
   }
   const s = await page.evaluate(() => window.__ctx.game.s);
   expect(budget).toHaveProperty('race');      // 'end' finishes before the 1.5 s budget sample in ?auto
-  expect(budget).toHaveProperty('strip');
+  for (const ch of ['strip', 'belt', 'plan', 'graph', 'surfaces', 'stunt']) expect(budget).toHaveProperty(ch);
   expect(s.reaction.simple).toHaveLength(3);
   expect(s.flags.lapDone).toBe(true);
-  expect(Object.values(s.trials).flat()).toHaveLength(1);
+  expect(Object.values(s.trials).flat()).toHaveLength(15);                  // 5 speeds × 3
+  expect(Object.values(s.trials).flat().filter(t => !t.valid)).toHaveLength(1);   // the sprinkler run
+  expect(s.hypothesis.pred).toBeTruthy();
+  for (const sf of ['dry', 'wet', 'sand', 'oil']) expect(s.surfaceTrials[sf].length).toBeGreaterThanOrEqual(3);
+  expect(s.flags.stuntDone).toBe(true);
+  expect(s.flags.roadWrongs).toBe(0);
   expect(errors).toEqual([]);
 });

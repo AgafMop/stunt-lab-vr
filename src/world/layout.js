@@ -2,7 +2,7 @@
 // three.js coordinates, metres, y up. The director's tower stands at the origin looking toward -z; the braking
 // strip runs along +x at z = STRIP.z and ends at the canyon rim (x ≈ RIM_X), like the road in the opening film.
 export const DECK_Y = 6;                                                     // tower deck height
-export const STRIP = { z: -14, gateX: -30, startX: -140, endX: 100, width: 8 };
+export const STRIP = { z: -14, gateX: -45, startX: -150, endX: 100, width: 8, rulerM: 140 };   // ruler 0…140 m from the gate (oil at 70 km/h ≈ 128 m)
 export const TRACK_ORIGIN = { x: 60, y: 0, z: -260 };                       // where track.js (0,0) sits
 export const RIM_X = 102;                                                   // near canyon rim beside the strip end
 

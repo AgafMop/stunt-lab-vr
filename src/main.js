@@ -21,13 +21,17 @@ import * as chStrip from './chapters/ch_strip.js';
 import * as chIntro from './chapters/ch_intro.js';
 import * as chBelt from './chapters/ch_belt.js';
 import * as chPlan from './chapters/ch_plan.js';
+import * as chGraph from './chapters/ch_graph.js';
+import * as chSurfaces from './chapters/ch_surfaces.js';
+import * as chStunt from './chapters/ch_stunt.js';
+import * as chRoad from './chapters/ch_road.js';
 import { createIntroVideo, primeIntroVideo } from './lab/introCinema.js';
 import { createGuide } from './ui/guide.js';
 import { createBumper } from './world/bumper.js';
 import { DECK_Y } from './world/layout.js';
 
-const CH = { intro: chIntro, race: chRace, belt: chBelt, plan: chPlan, strip: chStrip, end: chEnd };
-const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', belt: 'למה חגורה?', plan: 'תכנון המחקר', strip: 'הניסוי המרכזי', end: 'סיכום' };
+const CH = { intro: chIntro, race: chRace, belt: chBelt, plan: chPlan, strip: chStrip, graph: chGraph, surfaces: chSurfaces, stunt: chStunt, road: chRoad, end: chEnd };
+const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', belt: 'למה חגורה?', plan: 'תכנון המחקר', strip: 'הניסוי המרכזי', graph: 'הגרף והגילוי', surfaces: 'המשטחים', stunt: 'הצילום הגדול', road: 'מהסט לכביש', end: 'סיכום' };
 
 const params = new URLSearchParams(location.search);
 const TEST = params.has('test');

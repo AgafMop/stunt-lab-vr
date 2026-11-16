@@ -107,7 +107,7 @@ export async function loadStuntSet(engine) {
   }
   strip.rotation.x = -Math.PI / 2;
   const ticks = [];
-  for (let m = 0; m <= 120; m += 0.5) {
+  for (let m = 0; m <= STRIP.rulerM; m += 0.5) {
     const major = m % 5 === 0, mid = !major && m % 1 === 0;
     const g = new THREE.PlaneGeometry(major ? 0.12 : 0.05, major ? 2.2 : mid ? 1.2 : 0.6);
     g.rotateX(-Math.PI / 2); g.translate(STRIP.gateX + m, 0.02, STRIP.z + STRIP.width / 2 - (major ? 1.1 : mid ? 0.6 : 0.3));
@@ -117,7 +117,7 @@ export async function loadStuntSet(engine) {
   ruler.userData.pickable = true;
   // number signs every 10 m on the far side, sized for the tower view (≈ 1.4° letter height)
   const towerEye = new THREE.Vector3(0, DECK_Y + 1.17, -1.4);
-  for (let m = 0; m <= 120; m += 10) {
+  for (let m = 0; m <= STRIP.rulerM; m += 10) {
     const pos = new THREE.Vector3(STRIP.gateX + m, 0, STRIP.z - STRIP.width / 2 - 1.5);
     const d = pos.distanceTo(towerEye), h = Math.max(0.9, 0.0244 * d * 2.2);
     const sign = numberSign(String(m), h);

@@ -14,11 +14,13 @@ async function boot(page, query) {
 }
 
 test('clarity: the whole game names each task in order', async ({ page }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(330_000);
   const errors = await boot(page, '&auto&fresh&seed=42');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 220_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 320_000 });
   const log = await page.evaluate(() => window.__ctx.taskLog);
-  const order = ['race_choose', 'race_drill', 'race_lap', 'strip_pick', 'strip_ride', 'strip_action', 'strip_watch', 'strip_read', 'end'];
+  const order = ['race_choose', 'race_drill', 'race_reaction', 'race_lap', 'belt_choose', 'tyre_q', 'plan_iv', 'plan_sort', 'strip_ride',
+    'strip_action', 'strip_read', 'main_pick', 'main_decide', 'graph_pair', 'graph_explain', 'surf_pick', 'surf_rank', 'stunt_react', 'stunt_lamp',
+    'road_rain', 'road_auto', 'end'];
   let at = -1;
   for (const id of order) { const i = log.indexOf(id, at + 1); expect(i, `${id} after index ${at} in ${log.join(',')}`).toBeGreaterThan(at); at = i; }
   expect(errors).toEqual([]);

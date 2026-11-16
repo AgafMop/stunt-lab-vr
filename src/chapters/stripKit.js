@@ -111,7 +111,7 @@ function parachute() {
 export async function stripRun(ctx, scope, { kmh, brake, react = 0, surface = 'dry', driver = 'bumper', rideAlong = false, cliff = false, color = 0xf07a1a, slowMo = 1, speed = 1, zero = STRIP.gateX, onTick = null }) {
   const { engine, lab, loco } = ctx;
   const speedK = (ctx.auto ? ctx.animSpeed : 1) * speed;              // speed > 1: the crew's time-lapse runs
-  const plan = planStripRun({ kmh, brake, react, edge: cliff ? EDGE_M : null });
+  const plan = planStripRun({ kmh, brake, react, edge: cliff ? RIM_X - 0.3 - zero : null });   // the lip, in metres from `zero`
   const car = scope.add(lab.makeCar(color));
   car.rotation.y = Math.PI / 2;                                    // heading +x along the strip
   const setFront = m => car.position.set(zero + m - FRONT, 0, STRIP.z);           // zero: where the brake point (gate) is

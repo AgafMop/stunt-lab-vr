@@ -32,13 +32,13 @@ export function createResultsBoard(ctx, { surface = null } = {}) {
         const t = r.trials[i];
         if (t) {
           c.fillStyle = t.valid ? '#EEF2F8' : '#e86a5a';
-          ui.fitText(c, num(t.value.toFixed(1)), { x: xx - cols[i + 1], y, w: cols[i + 1] - 6, h: rh - 8, maxPx: rh * 0.5, minPx: mp, font: F, weight: 500 });
+          ui.fitText(c, num(t.value >= 100 ? t.value.toFixed(0) : t.value.toFixed(1)), { x: xx - cols[i + 1], y, w: cols[i + 1] - 6, h: rh - 8, maxPx: rh * 0.5, minPx: mp, font: F, weight: 500 });
           if (!t.valid) { c.strokeStyle = '#e86a5a'; c.lineWidth = 3; c.beginPath(); c.moveTo(xx - cols[i + 1] + 6, y + rh * 0.45); c.lineTo(xx - 10, y + rh * 0.45); c.stroke(); }
         }
         xx -= cols[i + 1];
       }
       const m = r.mean;
-      c.fillStyle = '#7CFF9B'; if (m != null) ui.fitText(c, num(m.toFixed(1)), { x: xx - cols[4], y, w: cols[4] - 6, h: rh - 8, maxPx: rh * 0.5, minPx: mp, font: F, weight: 700 });
+      c.fillStyle = '#7CFF9B'; if (m != null) ui.fitText(c, num(m >= 100 ? m.toFixed(0) : m.toFixed(1)), { x: xx - cols[4], y, w: cols[4] - 6, h: rh - 8, maxPx: rh * 0.5, minPx: mp, font: F, weight: 700 });
     });
     // ---- graph (left half) ----
     if (mode !== 'surface') drawGraph(c, 30, 74, W * 0.46 - 30, H - 104, rows, mp);

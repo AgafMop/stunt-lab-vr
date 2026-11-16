@@ -1,7 +1,7 @@
 # סרטון פתיחה — לו"ז עבודה מלא בג'מיני
 
-> **📍 איפה אנחנו (עודכן 16.11):** צעדים 1–14 גמורים (קליפים 9, 5, 7, 1, 4, 6 ✅).
-> **ממשיכים מצעד 15:** קליף 3, המכונית.
+> **📍 איפה אנחנו (עודכן 16.11):** צעדים 1–16 גמורים (קליפים 9, 5, 7, 1, 4, 6, 3 ✅).
+> **ממשיכים מצעד 17:** קליף 2, הסט מתעורר.
 
 כל צעד = הדבקה אחת בצ'ט. כל פרומפט שלם, כולל הסגנון. מעתיקים את כל הבלוק כמו שהוא.
 
@@ -115,7 +115,7 @@ Using the attached sheet for the exact look of the car, create one single widesc
 
 **צעד 16 · סרטון · לצרף: `frame-03.png` · שמור: `clip-03.mp4`**
 ```
-Animate this image as an 8-second cinematic shot. The camera glides slowly and low along the side of the parked orange stunt car, from the front wheel toward the back, golden light sliding across the glossy paint; heat shimmer rises from the asphalt. The car does not move. Keep the car exactly as it looks in the image. Stylized 3D animated feature film look, rich golden-hour light, cinematic anamorphic framing, shallow depth of field. No text, no letters, no logos, no badges, no license plate, no subtitles, no watermarks. Audio: the engine ticking as it cools, soft wind. No speech, no music.
+Animate this image as an 8-second cinematic shot. The camera glides slowly and low along the side of the parked orange stunt car, from the front wheel toward the back, golden light sliding across the glossy paint; heat shimmer rises from the asphalt. The car does not move. Keep the car exactly as it looks in the image. Stylized 3D animated feature film look, rich golden-hour light, cinematic anamorphic framing, shallow depth of field. No text, no letters, no logos, no badges, no license plate, no subtitles, no watermarks. Audio: soft desert wind only. No speech, no music.
 ```
 
 ### קליף 2 · הסט מתעורר

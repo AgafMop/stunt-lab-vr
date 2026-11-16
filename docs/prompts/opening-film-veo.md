@@ -3,7 +3,7 @@
 > **📍 איפה אנחנו (עודכן 15.11):** צעדים 1–4 ו-7–12 גמורים.
 > **מחר מתחילים כך:**
 > 1. **צעד 5 מחדש** (הפרומפט תוקן: הבגדים של דנה, קסדה אחת לרוני, בלי פסים שחורים). מצרפים את 3 הגיליונות. **מסתכלים על התמונה לפני שממשיכים.** אם יש קסדה ביד או שדנה לא כמו בגיליון, יוצרים אותה שוב.
-> 2. **צעד 6:** מנפישים את התמונה החדשה. שומרים בשם `clip-09.mp4`.
+> 2. **צעד 6:** מנפישים את `frame-091.png` (נבדקה, מתאימה). הפרומפט חוזק נגד הקסדה. שומרים בשם `clip-09.mp4`.
 > 3. **צעד 13 והלאה:** קליף 6, באמפר בבריכה.
 >
 > את צעד 7 (`frame-05`) לא צריך להשלים, כי הקליף כבר קיים.
@@ -56,9 +56,9 @@ Create a vehicle design sheet on a plain light-grey background showing the same 
 Using the three attached character sheets for the exact look of the characters, create one single widescreen 16:9 cinematic still: an empty wooden folding director's chair with a blank canvas back stands on a raised wooden tower platform, with a clipboard resting on its seat. Behind the chair, below the tower, a straight asphalt road runs to a cliff edge in a red desert canyon at sunset. Around the chair, a few meters away, stand the film director, dressed exactly as in her sheet (olive cap, dark sunglasses, olive utility vest over a light-blue shirt, dark cargo pants, red megaphone in her hand), seen from behind; the stunt driver in the deep-red racing suit, wearing her single mirrored-visor helmet on her head, hands empty; and the white crash-test robot with the cyan cartoon-eye screen face; all looking toward the chair. Warm golden-hour light, orange and violet sky, long shadows, soft dust in the air. Stylized 3D animated feature film look, clean shapes, slightly exaggerated proportions, cinematic anamorphic framing, shallow depth of field. The image fills the whole frame, no black bars. No visible human faces. No text, no letters, no logos, no watermarks.
 ```
 
-**צעד 6 · סרטון · לצרף: `frame-09.png` · שמור: `clip-09.mp4`**
+**צעד 6 · סרטון · לצרף: `frame-091.png` · שמור: `clip-09.mp4`**
 ```
-Animate this image as an 8-second cinematic shot. The camera slowly pushes in toward the empty director's chair. One by one, the film director, the helmeted stunt driver and the crash-test robot turn their heads toward the camera, as if waiting for someone to come and sit in the chair; the robot's cartoon eyes blink hopefully. Dust drifts in the warm sunset light. Keep the characters and the chair exactly as they look in the image. Stylized 3D animated feature film look, rich golden-hour light, cinematic anamorphic framing, shallow depth of field. No text, no letters, no logos, no subtitles, no watermarks. No visible human faces. Audio: soft desert wind, and a single film-clapper snap at the very end. No speech, no music.
+Animate this image as an 8-second cinematic shot. The camera slowly pushes in toward the empty director's chair. One by one, the film director, the helmeted stunt driver and the crash-test robot turn their heads toward the camera, as if waiting for someone to come and sit in the chair; as the robot turns, its screen face shows two big cyan cartoon eyes that blink hopefully. The stunt driver keeps her helmet on her head the whole time and her hands stay empty; nobody picks up or drops anything. Dust drifts in the warm sunset light. Keep the characters and the chair exactly as they look in the image. Stylized 3D animated feature film look, rich golden-hour light, cinematic anamorphic framing, shallow depth of field. No text, no letters, no logos, no subtitles, no watermarks. No visible human faces. Audio: soft desert wind, and a single film-clapper snap at the very end. No speech, no music.
 ```
 
 ### קליף 5 · הניסוי שנכשל

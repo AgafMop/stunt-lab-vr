@@ -37,6 +37,8 @@
   body.locked #cross { display:block; }
   #sub { position:fixed; bottom:56px; left:50%; transform:translateX(-50%); z-index:6; max-width:min(760px, calc(100% - 32px)); background:rgba(8,12,20,.86); color:var(--ink);
     font-size:20px; line-height:1.45; padding:10px 18px; border-radius:14px; text-align:right; pointer-events:none; }
+  #task { position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:6; max-width:min(620px, calc(100% - 200px)); background:rgba(10,14,22,.92); border:2px solid #FFB347; border-radius:14px; padding:8px 18px; text-align:right; pointer-events:none; color:var(--ink); }
+  #task b { display:block; color:#FFB347; font-size:13px; } #task div { font-size:19px; font-weight:700; line-height:1.35; } #task small { display:block; color:#9FB0C8; font-size:13px; margin-top:2px; }
   #meter { position:fixed; top:14px; right:14px; z-index:6; background:rgba(8,12,20,.86); border-radius:12px; padding:8px 14px; min-width:150px; direction:ltr; font-weight:700; color:var(--oxy); pointer-events:none; }
   #meter b { font-size:22px; margin-left:6px; } #meter span { font-size:14px; }
   #meter .bar { height:6px; background:#2a3a55; border-radius:3px; margin-top:6px; overflow:hidden; } #meter .bar i { display:block; height:100%; background:var(--accent); }
@@ -64,6 +66,7 @@
 <div id="hint" hidden></div>
 <div id="cross"></div>
 <div id="sub" hidden></div>
+<div id="task" hidden></div>
 <div id="meter" hidden><span>O₂</span><b></b><div class="bar"><i style="width:100%"></i></div></div>
 <script type="module" src="src/main.js"></script>
 </body>

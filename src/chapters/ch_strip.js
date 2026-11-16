@@ -23,6 +23,7 @@ export async function run(ctx, scope) {
 
   // ---- 1. speed ----
   const g = board(ctx, scope, 'A_board');
+  ctx.task?.set('strip_pick');
   scope.say('strip_pick');
   const target = await choose(ctx, scope, g, SPEEDS.map(v => [v, `${num(v)} קמ״ש`]), 60);
 
@@ -30,6 +31,7 @@ export async function run(ctx, scope) {
   const ride = params.get('ride');
   let rideAlong = ride === 'on';
   if (!ride) {
+    ctx.task?.set('strip_ride');
     scope.say('strip_ride');
     rideAlong = await choose(ctx, scope, g, [[true, 'כן, אני נוסע/ת'], [false, 'אני נשאר/ת במגדל']], false);
   }
@@ -39,9 +41,11 @@ export async function run(ctx, scope) {
   // ---- 3. Action! ----
   const clap = scope.add(clapper());
   lab.anchors.A_clapper.add(clap);
+  ctx.task?.set('strip_action');
   await scope.say('strip_action');
   await scope.waitSelect(clap);
   clap.visible = false;
+  ctx.task?.set('strip_watch');
 
   const { kmh, distance } = sampleRun(target, 'dry', makeRng(game.s.seed * 31 + 8));
   // the run's own friction (μ ± the noise) so the car stops exactly at the recorded distance
@@ -109,6 +113,7 @@ export async function run(ctx, scope) {
   const g2 = board(ctx, scope, 'A_board');
   const zoom = scope.add(ui.panel({ w: 0.9, h: 0.3, name: 'droneZoom', viewDist: 1.2, draw: (c, W, H) => drawZoom(ui, c, W, H, distance) }));
   zoom.mesh.position.set(0, 0.16, 0); g2.add(zoom.mesh);
+  ctx.task?.set('strip_read');
   scope.say('strip_read');
   const base = Math.round(distance * 2) / 2;
   const options = [1, 0.5, 0, -0.5, -1].map(k => base + k).filter(x => x >= 0);   // row() is RTL: list high→low so the chips grow left→right like the ruler
@@ -119,6 +124,7 @@ export async function run(ctx, scope) {
     await scope.say('strip_wrong');
   }
   game.addTrial(kmh, { value: distance, kmh, target, by: 'student' });
+  ctx.task?.clear();
   ctx.audio.sfx('ok');
   await scope.say('strip_done');
 }
@@ -134,9 +140,12 @@ async function choose(ctx, scope, g, items, autoValue, { y = 0, w = 0.26, h = 0.
     return c;
   });
   row(g, cards, { y });
+  const glowOffs = cards.map(c => ctx.attention?.(c.mesh) ?? (() => {}));
+  scope.add(() => glowOffs.forEach(f => f()));
   const i = items.findIndex(([v]) => v === autoValue);
   if (ctx.auto) setTimeout(() => ctx.input.select(cards[Math.max(0, i)].mesh), 300);
   const value = await scope.guard(chosen);
+  glowOffs.forEach(f => f());
   await scope.wait(250);
   for (const c of cards) g.remove(c.mesh);
   return value;

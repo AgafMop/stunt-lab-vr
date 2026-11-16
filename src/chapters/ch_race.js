@@ -38,9 +38,13 @@ export async function run(ctx, scope) {
       onSelect: c => { ctx.audio.sfx('click'); for (const x of cards) x.setState(x === c ? 'sel' : 'off'); pick(id); },
     })));
     row(g, cards);
+    const glowOffs = cards.map(c => ctx.attention?.(c.mesh) ?? (() => {}));
+    scope.add(() => glowOffs.forEach(f => f()));
+    ctx.task?.set('race_choose');
     scope.say('race_choose');
     if (ctx.auto) setTimeout(() => ctx.input.select(cards[0].mesh), 300);
     view = await scope.guard(chosen);
+    glowOffs.forEach(f => f());
     g.visible = false;
   }
   game.s.flags.view = view;
@@ -69,10 +73,13 @@ export async function run(ctx, scope) {
   const noControllers = () => params.has('nocontrollers') || (engine.isXR() && !drive.input.hasControllers());
   const ensureControllers = async () => {
     if (!noControllers()) return;
+    ctx.task?.set('race_controllers');
     await scope.say('race_controllers');
     while (noControllers()) { await scope.wait(500); if (noControllers()) await scope.say('race_controllers'); }
+    ctx.task?.set('race_drill');
   };
   await ensureControllers();
+  ctx.task?.set('race_drill');
   await scope.say('race_lights');
   while (game.s.reaction.simple.length < START_DRILLS) {
     await ensureControllers();
@@ -124,9 +131,11 @@ export async function run(ctx, scope) {
   scope.add(offStep);
   if (ctx.auto) drive.setDriver(car => autopilot(car, track, 15));
   drive.freeze(false);
+  ctx.task?.set('race_lap');
   await scope.say('race_go');
   await scope.guard(new Promise(res => { const off = engine.onFrame(() => { if (done) { off(); res(); } }); scope.add(off); }));
   game.s.flags.lapDone = true;
+  ctx.task?.clear();
   drive.freeze(true);
   drive.setDriver(null);
   await scope.say('race_done');

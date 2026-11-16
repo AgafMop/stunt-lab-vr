@@ -54,6 +54,7 @@ export async function playIntroCinema(ctx, scope, video, { loadTimeout = 15000, 
     hidden.forEach(o => { o.visible = true; });
     ui.subtitles.hide();
     video.inUse = false;
+    ctx.introPhase = 'done';
   };
 
   let result = 'ended';

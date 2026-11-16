@@ -20,6 +20,7 @@ import * as chRace from './chapters/ch_race.js';
 import * as chStrip from './chapters/ch_strip.js';
 import * as chIntro from './chapters/ch_intro.js';
 import { createIntroVideo, primeIntroVideo } from './lab/introCinema.js';
+import { createGuide } from './ui/guide.js';
 
 const CH = { intro: chIntro, race: chRace, strip: chStrip, end: chEnd };
 const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', strip: 'נסיעת מבחן', end: 'סיכום' };
@@ -96,6 +97,7 @@ const $ = id => document.getElementById(id);
 
 async function boot() {
   ctx.lab = await loadStuntSet(engine);
+  { const g = createGuide(ctx); ctx.task = g.task; ctx.attention = g.attention; ctx.taskLog = []; }
   if (wantsFilm()) ctx.introVideo = createIntroVideo();   // preload while the set loads
   ctx.loco = createLocomotion(engine, input, { room: { x0: -1.7, x1: 1.7, z0: -1.7, z1: 1.7 }, blocks: [[-0.7, 0.7, -0.75, -0.15]] });
   for (const id of ['tower', 'pit']) if (ctx.lab.stationNodes[id]) ctx.loco.addStation(id, ctx.lab.stationNodes[id], ctx.lab.discs[id]);

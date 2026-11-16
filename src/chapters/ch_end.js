@@ -17,7 +17,9 @@ export async function run(ctx, scope) {
   // the button's own onSelect is replaced by waitSelect's registration, so act after the wait
   const again = scope.add(ui.button3d('משחק חדש עם נתונים חדשים', () => {}, { w: 0.5, h: 0.1, viewDist: 1.1 }));
   again.mesh.position.set(0, -0.3, 0.01); g.add(again.mesh);
+  ctx.task?.set('end');
+  scope.add(() => ctx.task?.clear());
   if (ctx.auto) return;                     // tests end here
-  await scope.waitSelect(again.mesh, { auto: false });
+  await scope.waitSelect(again.mesh, { auto: false });   // glows (kit.waitSelect)
   location.search = '?fresh';
 }

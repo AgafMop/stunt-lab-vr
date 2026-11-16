@@ -27,8 +27,9 @@ export function createScope(ctx) {
     /** Wait until `obj` (Object3D) is selected. Auto mode selects it after a beat. */
     waitSelect(obj, { auto = true } = {}) {
       return scope.guard(new Promise(res => {
-        ctx.input.register(obj, { onSelect: () => { ctx.audio.sfx('click'); ctx.input.unregister(obj); res(obj); } });
-        scope.add(() => ctx.input.unregister(obj));
+        const glowOff = ctx.attention?.(obj) ?? (() => {});            // what to click now glows softly
+        ctx.input.register(obj, { onSelect: () => { ctx.audio.sfx('click'); ctx.input.unregister(obj); glowOff(); res(obj); } });
+        scope.add(() => { ctx.input.unregister(obj); glowOff(); });
         if (ctx.auto && auto) setTimeout(() => ctx.input.select(obj), 250);
       }));
     },

@@ -173,11 +173,18 @@ function drawZoom(ui, c, W, H, d) {
 
 /** A clapperboard prop (click = "Action!"). */
 function clapper() {
+  // a real film clapper: black slate with chalk lines, black-and-white striped sticks (no text — only pictures)
+  const tex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  const stripes = tex(256, 40, (g, w, h) => { g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, w, h); g.fillStyle = '#141414'; for (let x = -40; x < w; x += 52) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 26, h); g.lineTo(x + 52, 0); g.lineTo(x + 26, 0); g.fill(); } });
+  const slate = tex(256, 190, (g, w, h) => { g.fillStyle = '#1b1b1d'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(240,240,235,0.85)'; g.lineWidth = 4; for (const y of [60, 110, 160]) { g.beginPath(); g.moveTo(14, y); g.lineTo(w - 14, y); g.stroke(); } for (const x of [w / 3, 2 * w / 3]) { g.beginPath(); g.moveTo(x, 60); g.lineTo(x, 110); g.stroke(); } });
   const g = new THREE.Group(); g.name = 'clapper';
-  const board = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.02), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+  const dark = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.02), [dark, dark, dark, dark, new THREE.MeshStandardMaterial({ map: slate, roughness: 0.8 }), dark]);
   board.position.y = 0.09; g.add(board);
-  const stick = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.022), new THREE.MeshStandardMaterial({ color: 0xf2f2f2 }));
-  stick.position.set(0, 0.19, 0); stick.rotation.z = 0.25; g.add(stick);
+  const stickMat = [dark, dark, new THREE.MeshStandardMaterial({ map: stripes }), dark, new THREE.MeshStandardMaterial({ map: stripes }), dark];
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.022), stickMat); base.position.y = 0.185; g.add(base);
+  const stick = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.022), stickMat);
+  stick.geometry.translate(0.11, 0, 0); stick.position.set(-0.11, 0.205, 0); stick.rotation.z = 0.32; g.add(stick);   // hinged at the left, open
   g.rotation.x = -0.3;
   return g;
 }

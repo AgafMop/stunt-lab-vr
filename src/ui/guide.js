@@ -64,7 +64,10 @@ export function createGuide(ctx) {
   towerHome.position.set(-0.45, 6 + 1.33, -2.25);
   ctx.lab.root.add(towerHome);
   towerHome.lookAt(0, 6 + 1.17, -1.4);
-  const DASH = { pos: new THREE.Vector3(-0.42, 1.08, 0.66), rot: new THREE.Euler(-0.35, Math.PI, 0) };   // passenger side, faces the driver
+  // on the face of the dashboard, right of the steering wheel, BELOW the driver's line of sight over the dash (every corner of the
+  // loop is a right-hander: the windshield must stay clear); turned to face the driver's eye, 0.8 scale (≈ 0.9 m away)
+  const DASH = { pos: new THREE.Vector3(-0.36, 0.80, 0.30), scale: 0.8 };
+  const dashQ = (() => { const o = new THREE.Object3D(); o.position.copy(DASH.pos); o.lookAt(0.38, 1.12, -0.35); return o.quaternion.clone(); })();
 
   function home() {
     if (!text || ctx.introPhase === 'video') return null;
@@ -80,8 +83,11 @@ export function createGuide(ctx) {
       panel.mesh.removeFromParent();
       if (h) {
         h.add(panel.mesh);
-        if (h === towerHome) { panel.mesh.position.set(0, 0, 0); panel.mesh.rotation.set(0, 0, 0); }
-        else { panel.mesh.position.copy(DASH.pos); panel.mesh.rotation.copy(DASH.rot); }
+        const dash = h !== towerHome;
+        if (!dash) { panel.mesh.position.set(0, 0, 0); panel.mesh.quaternion.identity(); panel.mesh.scale.setScalar(1); }
+        else { panel.mesh.position.copy(DASH.pos); panel.mesh.quaternion.copy(dashQ); panel.mesh.scale.setScalar(DASH.scale); }
+        // on the dash it is a sticker on the dash face: drawn over the dash edge it touches, never hidden by it
+        panel.mesh.material.depthTest = !dash; panel.mesh.renderOrder = dash ? 50 : 0; panel.mesh.material.needsUpdate = true;
       }
     }
     panel.mesh.visible = !!h;

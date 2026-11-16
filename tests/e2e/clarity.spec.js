@@ -37,3 +37,26 @@ test('clarity: the view cards glow until one is chosen, and the task banner says
   expect(await glows()).toBe(0);
   expect(errors).toEqual([]);
 });
+
+test('clarity: in the cockpit the task card sits on the dash face, below the driver\'s line of sight', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors = await boot(page, '&only=race&ride=on&fresh');
+  await page.waitForFunction(() => window.__ctx.drive?.view?.mode === 'cockpit' && window.__ctx.engine.fadeLevel() < 0.05, null, { timeout: 200_000 });
+  await page.evaluate(() => { window.__ctx.engine.isXR = () => true; });          // the card only lives in 3D in the headset
+  await page.waitForFunction(() => window.__ctx.task.panel.mesh.parent === window.__ctx.drive.car3d, null, { timeout: 20_000 });
+  const r = await page.evaluate(async () => {
+    const THREE = await import('three');
+    const { drive, task } = window.__ctx;
+    const car = drive.car3d, m = task.panel.mesh, eye = car.getObjectByName('seat').position;
+    const p = m.geometry.attributes.position, below = [];
+    for (let i = 0; i < p.count; i++) {
+      const v = new THREE.Vector3().fromBufferAttribute(p, i).applyMatrix4(m.matrix);    // car-local
+      below.push(Math.atan2(v.y - eye.y, Math.hypot(v.x - eye.x, v.z - eye.z)) * 180 / Math.PI);
+    }
+    const dashTop = Math.atan2(0.98 - eye.y, 0.41 - eye.z) * 180 / Math.PI;
+    return { maxDeg: Math.max(...below), dashTop };
+  });
+  expect(r.maxDeg, `card top ${r.maxDeg.toFixed(1)}° vs dash top ${r.dashTop.toFixed(1)}°`).toBeLessThan(r.dashTop);
+  await page.screenshot({ path: '.superpowers/look/task-dash.png' });
+  expect(errors).toEqual([]);
+});

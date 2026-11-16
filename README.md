@@ -37,6 +37,12 @@ npx playwright test -g "full game"
 - `?world=lite` flat ground + sky (a fallback if a headset struggles; `?test` uses it by default — software GL is too
   slow for the terrain shader) · `?world=full` forces the real world.
 
+## Clarity
+- "The task now" (`TASKS` in `src/game/script.js`, shown by `src/ui/guide.js`): a banner on desktop; in the headset a
+  card ≈30° left / ≈10° above the eyes on the tower, and on the dash face (below the sight line) while driving.
+- `ctx.attention(obj)` glows softly around what to click; `scope.waitSelect` does it automatically.
+- Every line is voiced (`node tools/voices.mjs`; voices: Laura = Dana, Lily = Roni, Liam = Bumper).
+
 ## Controls
 | | Headset | Desktop |
 |---|---|---|

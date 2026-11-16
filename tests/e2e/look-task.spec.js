@@ -14,3 +14,17 @@ test('look: task card and glow (screenshots)', async ({ page }) => {
   await page.waitForTimeout(1500);
   await page.screenshot({ path: '.superpowers/look/task-card-3d.png' });
 });
+
+test('look: the clapper glows at "Action!" (screenshots)', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/?test&world=full&fresh&only=strip&ride=off');
+  await expect(page.locator('#enter')).toBeEnabled({ timeout: 180_000 });
+  await page.click('#enter');
+  await page.waitForFunction(() => window.__ctx.taskLog?.includes('strip_pick'), null, { timeout: 120_000 });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => { let c; window.__ctx.engine.scene.traverse(o => { if (!c && o.userData.choice) c = o; }); window.__ctx.input.select(c); });
+  await page.waitForFunction(() => window.__ctx.taskLog.includes('strip_action'), null, { timeout: 60_000 });
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: '.superpowers/look/clapper-glow.png' });
+});

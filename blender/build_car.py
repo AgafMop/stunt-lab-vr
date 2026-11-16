@@ -105,6 +105,13 @@ for zc in (-1.35, 1.35):                                       # wheel arches
     bpy.context.view_layer.objects.active = body
     bpy.ops.object.modifier_apply(modifier='arch')
     bpy.data.objects.remove(cut)
+# the cabin opening: the loft is a closed solid, so cut the cockpit out of it (else its top runs through the cabin)
+cab = box('cabcut', (1.56, 2.30, 1.0), T(0, 1.05, -0.20))         # three x ±0.78, z -1.35…0.95, y 0.55…1.55
+m = body.modifiers.new('cab', 'BOOLEAN'); m.operation = 'DIFFERENCE'; m.object = cab; m.solver = 'EXACT'
+bpy.context.view_layer.objects.active = body
+bpy.ops.object.modifier_apply(modifier='cab')
+bpy.data.objects.remove(cab)
+
 # fender flares (wide, like the film car)
 for x in (-1, 1):
     for zc in (-1.35, 1.35):

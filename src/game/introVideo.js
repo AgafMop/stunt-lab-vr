@@ -24,10 +24,10 @@ export const DURATION = Math.round((SHOT_AT.at(-1) + SHOTS.at(-1).len) * 1000) /
 
 // shot: 1-based index into SHOTS; at: seconds into that shot; dur: how long the subtitle (and later the voice) may run
 const CUE_LIST = [
-  { id: 'intro_scene', shot: 2, at: 3.8, dur: 4.4 },
+  { id: 'intro_scene', shot: 2, at: 3.0, dur: 5.4 },
   { id: 'intro_line', shot: 4, at: 2.5, dur: 3.6 },
-  { id: 'intro_action', shot: 5, at: 0.3, dur: 1.4 },
-  { id: 'intro_bumper', shot: 6, at: 3.4, dur: 4.2 },
+  { id: 'intro_action', shot: 5, at: 0.3, dur: 1.6 },
+  { id: 'intro_bumper', shot: 6, at: 3.2, dur: 4.4 },
   { id: 'intro_roni', shot: 7, at: 2.0, dur: 6.2 },
   { id: 'intro_sun', shot: 8, at: 0.2, dur: 3.6 },
   { id: 'intro_chair', shot: 9, at: 1.8, dur: 5.8 },

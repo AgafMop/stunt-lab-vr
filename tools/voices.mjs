@@ -12,15 +12,17 @@ const env = readFileSync(`${homedir()}/.claude/skills/speech-generator/scripts/.
 const KEYS = [...env.matchAll(/^ELEVENLABS_API_KEY\w*=(.+)$/gm)].map(m => m[1].trim().replace(/^["']|["']$/g, ''));
 if (!KEYS.length) throw new Error('no ELEVENLABS_API_KEY in the speech-generator .env');
 
-// one ElevenLabs voice per speaker in script.js → SPEAKERS. Pick with tools like the ElevenLabs voice library;
-// these ids are the ones the oxygen lab used (commander: deep male; azoulay: confident female; robi: light, friendly).
-const VOICE = { commander: 'pNInz6obpgDQGcFmaJgB', robi: 'IKne3meq5aSn9XLyUdCD', azoulay: 'EXAVITQu4vr4xnSDxMaL' };
-const TAG = { commander: '[serious, commanding]', robi: '[cheerful]', azoulay: '[confident]' };     // eleven_v3 audio tags
+// one ElevenLabs voice per speaker in script.js → SPEAKERS. Free accounts can only use the premade voices over the API
+// (library voices return 402). The oxygen lab used Adam, Sarah and Charlie; this lab uses fresh ones:
+// dana: Laura (energetic, sassy director) · roni: Lily (confident, calm) · bumper: Liam (young, energetic) + robot echo.
+const VOICE = { dana: 'FGY2WhTYpPnrIDTdsKH5', roni: 'pFZP5JQG7iQjIQuC4Bku', bumper: 'TX3LPaxmHKxFdv7VOQHJ' };
+const TAG = { dana: '[energetic, commanding]', roni: '[calm, serious]', bumper: '[playful]' };     // eleven_v3 audio tags
 const FILTER = {                                                                                        // ffmpeg -af per speaker
-  robi: 'aecho=0.8:0.6:9:0.22,highpass=f=110,acompressor=threshold=-18dB:ratio=3,volume=1.15',          // slight robot echo
-  commander: 'highpass=f=280,lowpass=f=3600,acompressor=threshold=-20dB:ratio=4,volume=1.3',            // radio / hologram band
-  azoulay: 'highpass=f=80,acompressor=threshold=-20dB:ratio=2.5,volume=1.1',
+  bumper: 'aecho=0.8:0.6:9:0.22,highpass=f=110,acompressor=threshold=-18dB:ratio=3,volume=1.15',        // slight robot echo
+  dana: 'highpass=f=80,acompressor=threshold=-20dB:ratio=2.5,volume=1.1',
+  roni: 'highpass=f=80,acompressor=threshold=-20dB:ratio=2.5,volume=1.1',
 };
+const LEVEL = 'loudnorm=I=-18:TP=-2:LRA=11,aresample=44100';      // every line at the same loudness (a whispered take is not quieter)
 const OUT = 'assets/voice';
 const arg = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1].split(',') : null; };
 const force = new Set(arg('--force') || []), only = arg('--only');
@@ -60,7 +62,7 @@ function similarity(a, b) {
 async function make(id, l) {
   const raw = `${OUT}/${id}.raw.mp3`, out = `${OUT}/${id}.mp3`;
   writeFileSync(raw, await tts(`${TAG[l.speaker] ?? ''} ${l.say ?? l.text}`, VOICE[l.speaker]));
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', raw, '-af', FILTER[l.speaker] ?? 'anull', '-ac', '1', '-b:a', '64k', out]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', raw, '-af', `${FILTER[l.speaker] ?? 'anull'},${LEVEL}`, '-ac', '1', '-b:a', '64k', out]);
   unlinkSync(raw);
   return out;
 }

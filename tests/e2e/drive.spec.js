@@ -18,7 +18,8 @@ test('drive sandbox: both views, toggle, no errors', async ({ page }) => {
   const errors = await boot(page, '&fx=drive&ride=on');
   expect(await page.evaluate(() => window.__ctx.drive.view.mode)).toBe('cockpit');
   await page.keyboard.down('KeyW');
-  await page.waitForTimeout(3000);
+  // software GL draws a few fps and the stepper caps sim time per frame (by design): wait for the speed, not a clock
+  await page.waitForFunction(() => window.__ctx.drive.car.speed > 2.2, null, { timeout: 20_000 }).catch(() => {});
   await page.keyboard.up('KeyW');
   const s = await page.evaluate(() => {
     const { engine, drive } = window.__ctx;

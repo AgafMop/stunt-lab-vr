@@ -97,6 +97,7 @@ export async function run(ctx, scope) {
   // ---- 3. one lap against Bumper ----
   const track = drive.track;
   const ghost = ctx.lab.makeCar(0x3cc4bc); ctx.lab.world.add(ghost); scope.add(ghost);
+  ghost.traverse(o => { o.castShadow = false; });                     // keeps the cockpit lap inside the triangle budget
   const ghostMini = ctx.lab.makeCar(0x3cc4bc); ghostMini.scale.setScalar(2.2); ctx.lab.mini.add(ghostMini); scope.add(ghostMini);
   let gs = 0, done = false, progress = 0, lastS = 0, armed = false;
   const placeGhost = () => {

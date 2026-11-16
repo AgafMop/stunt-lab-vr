@@ -11,7 +11,7 @@ import { createVignette } from '../fx/vignette.js';
 export function createDriveView(ctx, { car3d, forced = false }) {
   const { engine, lab, loco } = ctx;
   const seat = car3d.getObjectByName('seat');
-  const frame = cockpitFrame(); car3d.add(frame);
+  const frame = car3d.userData.built ? new THREE.Group() : cockpitFrame(); car3d.add(frame);   // the Blender car has a real dash + pillars
   const mini = lab.makeCar(); mini.scale.setScalar(2.2); lab.mini.add(mini);    // 2.2× so the model car reads on the table
   const vignette = createVignette(engine);
   const eye = new THREE.Vector3();
@@ -52,12 +52,14 @@ export function createDriveView(ctx, { car3d, forced = false }) {
         vignette.set(Math.max((yawRate - 0.4) / 1.2, accel > 4 ? (accel - 4) / 6 : 0));
       }
       prevHeading = car.heading; prevSpeed = car.speed;
+      lab.focusShadow?.(car3d.position.x, car3d.position.z);          // the sun's shadow map follows the car
       loco.applyFollow();
     },
     dispose() {
       loco.follow(null); loco.lock(false);
       lab.world.visible = true; lab.table.visible = false;
       car3d.remove(frame); lab.mini.remove(mini); vignette.dispose();
+      lab.focusShadow?.(25, -12);
     },
   };
   return view;

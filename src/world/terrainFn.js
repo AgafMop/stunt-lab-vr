@@ -95,7 +95,7 @@ export function heightAt(x, z) {
 }
 
 // ---- warped grid: ≈ 2 m cells at the centre, ≈ 55 m at the edge, ±3.2 km ----
-export const GRID = { n: 320, cx: 200, cz: -120, S: 3200, a: 0.1, p: 3 };
+export const GRID = { n: 300, cx: 200, cz: -120, S: 3200, a: 0.1, p: 3 };
 const warp = u => Math.sign(u) * GRID.S * (GRID.a * Math.abs(u) + (1 - GRID.a) * Math.abs(u) ** GRID.p);
 export function gridToWorld(i, j) {
   return { x: GRID.cx + warp((i / GRID.n) * 2 - 1), z: GRID.cz + warp((j / GRID.n) * 2 - 1) };

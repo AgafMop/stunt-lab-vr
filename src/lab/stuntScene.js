@@ -13,6 +13,7 @@ import { loadTerrain } from '../world/terrain.js';
 import { createSky } from '../world/sky.js';
 import { createScatter } from '../world/scatter.js';
 import { createDust } from '../world/dust.js';
+import { createTrack3d } from '../world/track3d.js';
 
 export const BUILT = { set: false };      // flip when blender/build_set.py has written assets/set.glb
 
@@ -42,12 +43,14 @@ export async function loadStuntSet(engine) {
   sun.castShadow = !lite; sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95, near: 1, far: 900 });
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
-  const focusShadow = (x, z) => { sun.target.position.set(x, 0, z); sun.position.set(x + L.SUN_DIR[0] * 400, L.SUN_DIR[1] * 400, z + L.SUN_DIR[2] * 400); sun.target.updateMatrixWorld(); };
+  const focusShadow = (x, z) => { x = Math.round(x / 8) * 8; z = Math.round(z / 8) * 8;   // snapped: no shimmer while following
+    if (sun.target.position.x === x && sun.target.position.z === z) return;
+    sun.target.position.set(x, 0, z); sun.position.set(x + L.SUN_DIR[0] * 400, L.SUN_DIR[1] * 400, z + L.SUN_DIR[2] * 400); sun.target.updateMatrixWorld(); };
   focusShadow(25, -12);
   scene.add(sun, sun.target);
-  const catcher = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.ShadowMaterial({ color: 0x3a1206, opacity: 0.5,
+  const catcher = new THREE.Mesh(new THREE.PlaneGeometry(440, 480), new THREE.ShadowMaterial({ color: 0x3a1206, opacity: 0.5,
     polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
-  catcher.rotation.x = -Math.PI / 2; catcher.position.set(25, 0.003, -12); catcher.receiveShadow = true; catcher.name = 'shadowCatcher';
+  catcher.rotation.x = -Math.PI / 2; catcher.position.set(5, 0.003, -120); catcher.receiveShadow = true; catcher.name = 'shadowCatcher';
 
   const root = new THREE.Group(); root.name = 'set';
   const world = new THREE.Group(); world.name = 'world';            // hidden in the tabletop RC view
@@ -128,6 +131,7 @@ export async function loadStuntSet(engine) {
   laser.name = 'laser';
 
   // ---- director's tower (deck at DECK_Y, facing the strip = -z) ----
+  await loadCarModel();
   const tower = new THREE.Group(); tower.name = 'tower'; root.add(tower);   // stays visible in the RC view
   mesh(tower, new THREE.BoxGeometry(4, 0.2, 4), mat(0x8b6b4a), [0, DECK_Y - 0.1, 0], 'deck');
   const legs = [];
@@ -156,7 +160,7 @@ export async function loadStuntSet(engine) {
 
   // ---- race track ----
   const track = buildTrack(TRACK_DEF);
-  const track3d = trackMesh(track);
+  const track3d = createTrack3d(track, { full: true });
   track3d.position.copy(TRACK_ORIGIN);
   world.add(track3d);
   const st = track.sample(0);
@@ -166,7 +170,7 @@ export async function loadStuntSet(engine) {
   const table = new THREE.Group(); table.name = 'table'; table.visible = false;
   anchors.A_table.add(table);
   mesh(table, new THREE.BoxGeometry(2.4, 0.04, 2.8), mat(0x6b4f36), [0, -0.02, 0], 'tableTop');
-  const mini = trackMesh(track); mini.name = 'miniTrack';
+  const mini = createTrack3d(track, { full: false });
   mini.scale.setScalar(TABLE.scale);
   // centre the loop on the table: track bounds x∈[-134,0], z∈[-34,134]
   mini.position.set(67 * TABLE.scale, 0.005, -50 * TABLE.scale);
@@ -212,43 +216,64 @@ function numberSign(text, h) {
   return m;
 }
 
-/** The track as one ribbon mesh (vertex colours: wet section darker, white edge lines). Local to track.js coords. */
-function trackMesh(track) {
-  const half = track.def.width / 2, n = Math.ceil(track.length / 2);
-  const pos = [], col = [], idx = [];
-  const dry = new THREE.Color(0x45454c), wet = new THREE.Color(0x24303c), edge = new THREE.Color(0xeeeeee);
-  const across = [-half - 0.4, -half, half, half + 0.4];
-  for (let i = 0; i <= n; i++) {
-    const s = (i / n) * track.length, p = track.sample(s);
-    const isWet = s >= track.def.wet[0] && s <= track.def.wet[1];
-    across.forEach((u, j) => {
-      pos.push(p.x + p.tz * u, 0.015, p.z - p.tx * u);
-      const c = j === 0 || j === 3 ? edge : isWet ? wet : dry;
-      col.push(c.r, c.g, c.b);
-    });
-    if (i < n) for (let j = 0; j < 3; j++) {
-      const a = i * 4 + j, b = a + 4;
-      idx.push(a, b, a + 1, a + 1, b, b + 1);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  geo.setIndex(idx); geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
-  m.name = 'track';
+// the Blender-built car (blender/build_car.py → assets/car.glb), loaded once by loadCarModel(); makeCar() clones it
+let CAR_MODEL = null;
+export async function loadCarModel() {
+  try { CAR_MODEL = (await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('assets/car.glb')).scene; }
+  catch (e) { console.warn('car.glb unavailable, box car', e); }
+}
+
+/** Car paint with the film's twin black racing stripes over the hood, roof and tail (by car-local x, top-facing). */
+function paintMaterial(color) {
+  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.25 });
+  m.onBeforeCompile = sh => {
+    sh.vertexShader = 'varying vec3 vCarP; varying vec3 vCarN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vCarP = position; vCarN = normal;');
+    sh.fragmentShader = 'varying vec3 vCarP; varying vec3 vCarN;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      float ax = abs(vCarP.x);
+      float band = smoothstep(0.055, 0.065, ax) * (1.0 - smoothstep(0.29, 0.30, ax));
+      float top = smoothstep(0.25, 0.45, vCarN.y) * step(0.6, vCarP.y);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.025), band * top);`);
+  };
+  m.customProgramCacheKey = () => 'carpaint';
   return m;
 }
 
-/** A stylised stunt car. Children: 'seat' (driver eye), 'seatP' (passenger eye), 'wheel' (steering wheel),
- *  'frontWheel' (front axle on the ground — what the student reads on the ruler). Faces +z at rotation.y = 0. */
+/** A stunt car. Children: 'seat' (driver eye), 'seatP' (passenger eye), 'wheel' (steering wheel),
+ *  'frontWheel' (front axle on the ground — what the student reads on the ruler). Faces +z at rotation.y = 0.
+ *  Its wheels roll by the distance it moves (whoever moves it). */
 export function makeCar(color = 0xf07a1a) {
   const car = new THREE.Group(); car.name = 'car';
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.55, 4.2), mat(color, 0.35, 0.3)); body.position.y = 0.55; car.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 1.9), mat(0x1c1c22, 0.2, 0.4)); cabin.position.set(0, 1.07, -0.3); car.add(cabin);
-  const wheels = [];
-  for (const x of [-0.85, 0.85]) for (const z of [-1.35, 1.35]) { const g = new THREE.CylinderGeometry(0.33, 0.33, 0.28, 14); g.rotateZ(Math.PI / 2); g.translate(x, 0.33, z); wheels.push(g); }
-  car.add(new THREE.Mesh(mergeGeometries(wheels), mat(0x151515)));
+  if (CAR_MODEL) {
+    const m = CAR_MODEL.clone(true), paint = paintMaterial(color), wheels = [];
+    m.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      if (o.material.name === 'M_paint') o.material = paint;
+      if (o.material.name === 'M_lamp' || o.material.name === 'M_tail') o.material.toneMapped = false;
+    });
+    for (const n of ['FL', 'FR', 'RL', 'RR']) { const w = m.getObjectByName(`CAR_wheel_${n}`); if (w) wheels.push(w); }
+    car.add(m); car.userData.built = true;
+    // roll the wheels: once per rendered frame, by the distance moved along the car's heading
+    const last = new THREE.Vector3(), p = new THREE.Vector3(), fwd = new THREE.Vector3();
+    let frame = -1, init = false;
+    const roll = renderer => {
+      if (renderer.info.render.frame === frame) return; frame = renderer.info.render.frame;
+      car.getWorldPosition(p);
+      if (init) {
+        fwd.set(0, 0, 1).applyQuaternion(car.getWorldQuaternion(new THREE.Quaternion()));
+        const d = p.clone().sub(last).dot(fwd) / (car.getWorldScale(new THREE.Vector3()).x || 1);
+        if (Math.abs(d) < 5) for (const w of wheels) w.rotation.x += d / 0.37;
+      }
+      last.copy(p); init = true;
+    };
+    m.traverse(o => { if (o.isMesh && o.name.startsWith('CAR_paint')) o.onBeforeRender = roll; });
+  } else {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.55, 4.2), mat(color, 0.35, 0.3)); body.position.y = 0.55; car.add(body);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 1.9), mat(0x1c1c22, 0.2, 0.4)); cabin.position.set(0, 1.07, -0.3); car.add(cabin);
+    const wheels = [];
+    for (const x of [-0.85, 0.85]) for (const z of [-1.35, 1.35]) { const g = new THREE.CylinderGeometry(0.33, 0.33, 0.28, 14); g.rotateZ(Math.PI / 2); g.translate(x, 0.33, z); wheels.push(g); }
+    car.add(new THREE.Mesh(mergeGeometries(wheels), mat(0x151515)));
+  }
   const seat = new THREE.Object3D(); seat.name = 'seat'; seat.position.set(0.38, 1.12, -0.35); car.add(seat);
   const seatP = new THREE.Object3D(); seatP.name = 'seatP'; seatP.position.set(-0.38, 1.12, -0.35); car.add(seatP);
   const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.018, 8, 28), mat(0x111111, 0.5)); wheel.name = 'wheel';

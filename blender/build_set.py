@@ -171,6 +171,39 @@ blk('orange', (1.6, 1.0, 0.9), (-6.0, 0.55, 9.5), bevel=0.06)                   
 blk('dark', (1.7, 0.12, 1.0), (-6.0, 0.06, 9.5))
 tube('metal', 0.05, 0.6, (-5.5, 1.2, 9.3), verts=10)
 
+# ---------------- the race: pit tent beside the start, water truck at the wet corner ----------------
+TS = L['TRACK_SPOTS']
+st, wm, half = TS['start'], TS['wetMid'], TS['half']
+# pit: the student's pit station is 8 m to the right (+x) of the start; the tent stands behind it, off the track
+px, pz = st['x'] + 15.0, st['z'] - 3.0
+for sx in (-2.0, 2.0):
+    for sz in (-2.0, 2.0):
+        beam('metal', (px + sx, 0, pz + sz), (px + sx, 2.4, pz + sz), 0.05)
+blk('orange', (4.3, 0.05, 4.3), (px, 2.5, pz))
+for sx, sz, ry in ((0, -2.15, 0), (0, 2.15, 0), (-2.15, 0, math.pi / 2), (2.15, 0, math.pi / 2)):
+    blk('canvas', (4.3, 0.3, 0.02), (px + sx, 2.28, pz + sz), rot_y=ry)
+blk('dark', (1.2, 0.9, 0.55), (px + 1.2, 0.45, pz + 1.3), bevel=0.04)                     # tool chest
+blk('red', (1.22, 0.06, 0.57), (px + 1.2, 0.92, pz + 1.3))
+for k in range(4):                                                                          # spare tyres
+    tube('dark', 0.36, 0.26, (px - 1.2, 0.13 + k * 0.27, pz - 1.0), verts=14)
+# water truck parked on the outside of the wet corner (the spill in the race story), facing along the track
+nx, nz = wm['tz'], -wm['tx']                                                                # +u = outside (left)
+wx, wz = wm['x'] + nx * (half + 27), wm['z'] + nz * (half + 27)   # behind the tyre wall: an understeering car runs off right here
+yaw = math.atan2(wm['tx'], wm['tz'])
+fx, fz = math.sin(yaw), math.cos(yaw)
+def along(d, s=0.0):
+    return (wx + fx * d + nx * s, wz + fz * d + nz * s)
+cx_, cz_ = along(2.6)
+blk('red', (2.3, 1.9, 1.8), (cx_, 1.55, cz_), bevel=0.12, rot_y=yaw)                     # cab
+blk('dark', (2.1, 0.7, 0.05), (along(3.52)[0], 1.95, along(3.52)[1]), rot_y=yaw)         # windscreen
+tx_, tz_ = along(-1.2)
+tank = tube('metal', 1.0, 4.6, (tx_, 1.75, tz_), verts=20, axis='Z3', rot=(0, 0, -yaw))
+blk('dark', (2.2, 0.35, 7.4), (along(0.4)[0], 0.75, along(0.4)[1]), rot_y=yaw)           # chassis
+for d in (2.6, -0.4, -2.4):
+    for s_ in (-1.0, 1.0):
+        x_, z_ = along(d, s_)
+        tube('dark', 0.5, 0.35, (x_, 0.5, z_), verts=16, axis='X', rot=(0, 0, -yaw))
+
 # ---------------- materials + join per material ----------------
 wood = pbr_material('M_wood', polyhaven_texture('rough_wood'), tint=(0.95, 0.82, 0.68))
 planks = pbr_material('M_planks', polyhaven_texture('rough_wood'), tint=(1.05, 0.88, 0.70))

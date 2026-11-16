@@ -14,18 +14,20 @@ import { createStorage } from './game/storage.js';
 import { CHAPTERS, SAVE_KEY, METER } from './game/config.js';
 import { createScope, Abort } from './chapters/kit.js';
 import { createDriveSession } from './core/driveSession.js';
-import { sampleRun, makeRng } from './game/model.js';
+import { makeRng, cleanRuns } from './game/model.js';
 import * as chEnd from './chapters/ch_end.js';
 import * as chRace from './chapters/ch_race.js';
 import * as chStrip from './chapters/ch_strip.js';
 import * as chIntro from './chapters/ch_intro.js';
+import * as chBelt from './chapters/ch_belt.js';
+import * as chPlan from './chapters/ch_plan.js';
 import { createIntroVideo, primeIntroVideo } from './lab/introCinema.js';
 import { createGuide } from './ui/guide.js';
 import { createBumper } from './world/bumper.js';
 import { DECK_Y } from './world/layout.js';
 
-const CH = { intro: chIntro, race: chRace, strip: chStrip, end: chEnd };
-const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', strip: 'הניסוי המרכזי', end: 'סיכום' };
+const CH = { intro: chIntro, race: chRace, belt: chBelt, plan: chPlan, strip: chStrip, end: chEnd };
+const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', belt: 'למה חגורה?', plan: 'תכנון המחקר', strip: 'הניסוי המרכזי', end: 'סיכום' };
 
 const params = new URLSearchParams(location.search);
 const TEST = params.has('test');
@@ -171,23 +173,34 @@ async function runGame() {
   window.__gameDone = true;
 }
 
-/** State a chapter expects when run alone (?only=<id>) — keep in step with skipFill. */
+/** State a chapter expects when run alone (?only=<id>): everything the earlier chapters would have recorded. */
 function seedFor(id) {
-  void id;
+  for (const prev of CHAPTERS.slice(0, CHAPTERS.indexOf(id))) skipFill(prev);
 }
 
-/** Teacher demo: a skipped chapter leaves the state as if played (results recorded from the same science model). */
+/** Teacher demo / ?only: a skipped chapter leaves the state as if played (results from the same science model). */
 function skipFill(id) {
+  const rng = makeRng(game.s.seed * 31 + 8);
   if (id === 'race') {
     game.s.flags.view ??= 'table';
-    game.s.reaction ??= { simple: [0.28, 0.28, 0.28], falseStarts: 0 };
-    if (!game.s.reaction.simple.length) game.s.reaction.simple = [0.28, 0.28, 0.28];
+    game.s.reaction ??= { simple: [], falseStarts: 0 };
+    if (!game.s.reaction.simple.length) game.s.reaction.simple = [0.28, 0.27, 0.29];
+    game.s.reaction.mean ??= game.s.reaction.simple.reduce((a, b) => a + b, 0) / game.s.reaction.simple.length;
     game.s.flags.lapDone = true;
   }
-  if (id === 'strip' && !Object.keys(game.s.trials).length) {
-    const r = sampleRun(60, 'dry', makeRng(game.s.seed * 31 + 8));
-    game.addTrial(r.kmh, { value: r.distance, kmh: r.kmh, target: 60, by: 'student' }, { free: true });
+  if (id === 'belt') { game.s.flags.beltFirst ??= 'belt'; game.s.flags.tyreTries ??= 1; }
+  if (id === 'plan') game.s.hypothesis ??= { pred: 'x2', graph: 'line' };
+  if (id === 'strip') {
+    game.s.plan = game.s.plan?.length ? game.s.plan : [30, 40, 60, 80, 110];
+    for (const v of game.s.plan) {
+      const have = (game.s.trials[v] || []).length;
+      for (const r of cleanRuns(v, 'dry', rng, 3).slice(have)) game.addTrial(v, { value: r.distance, kmh: r.kmh, by: 'crew' }, { free: true });
+    }
     game.s.flags.rodeAlong ??= false;
+  }
+  if (id === 'surfaces') {
+    game.s.surfaceTrials ??= {};
+    for (const sf of ['dry', 'wet', 'sand', 'oil']) game.s.surfaceTrials[sf] ??= cleanRuns(70, sf, rng, 3).map(r => ({ value: r.distance, kmh: r.kmh, valid: true }));
   }
 }
 

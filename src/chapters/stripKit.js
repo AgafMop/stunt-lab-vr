@@ -108,17 +108,18 @@ function parachute() {
  * driver: 'bumper' | 'roni' | null; rideAlong: the student rides in the passenger seat; cliff: the run may go over
  * the edge (stunt). Resolves { car, stop (ruler m of the front axle), fell }.
  */
-export async function stripRun(ctx, scope, { kmh, brake, react = 0, surface = 'dry', driver = 'bumper', rideAlong = false, cliff = false, color = 0xf07a1a, slowMo = 1, speed = 1 }) {
+export async function stripRun(ctx, scope, { kmh, brake, react = 0, surface = 'dry', driver = 'bumper', rideAlong = false, cliff = false, color = 0xf07a1a, slowMo = 1, speed = 1, zero = STRIP.gateX, onTick = null }) {
   const { engine, lab, loco } = ctx;
   const speedK = (ctx.auto ? ctx.animSpeed : 1) * speed;              // speed > 1: the crew's time-lapse runs
   const plan = planStripRun({ kmh, brake, react, edge: cliff ? EDGE_M : null });
   const car = scope.add(lab.makeCar(color));
   car.rotation.y = Math.PI / 2;                                    // heading +x along the strip
-  const setFront = m => car.position.set(STRIP.gateX + m - FRONT, 0, STRIP.z);
+  const setFront = m => car.position.set(zero + m - FRONT, 0, STRIP.z);           // zero: where the brake point (gate) is
   setFront(plan.start);
   lab.world.add(car);
   ctx.track?.(car, 'stripCar');
-  if (driver) { const d = makeDriver(ctx, driver); car.add(d); scope.add(() => d.userData.dispose?.()); }
+  let driverObj = null;
+  if (driver) { driverObj = makeDriver(ctx, driver); car.add(driverObj); scope.add(() => driverObj.userData.dispose?.()); }
   const layer = surface !== 'dry' && surface !== 'sprinkler' ? surfaceLayer(surface) : null;
   if (layer) { lab.world.add(layer); scope.add(layer); }
   let spr = null, wetLater = null;
@@ -161,6 +162,7 @@ export async function stripRun(ctx, scope, { kmh, brake, react = 0, surface = 'd
         return;
       }
       setFront(plan.frontAt(t));
+      onTick?.(t, plan, car, driverObj);
       loco.applyFollow();
       if (rideAlong && ctx.stripRun) {                             // comfort audit: the rig moves level with the car
         ctx.stripRun.rigTravel = Math.max(ctx.stripRun.rigTravel, engine.rig.position.distanceTo(rigStart));

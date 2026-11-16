@@ -159,13 +159,13 @@ for x in (-1, 1):
 blk('trim', (1.5, 0.03, 0.26), (0, 1.07, -1.94), bevel=0.01)                         # rear wing
 
 # ---------------- interior: floor, dash, binnacle, seats, cage, door cards ----------------
-blk('interior', (1.6, 0.05, 2.4), (0, 0.34, -0.15))
+blk('interior', (1.56, 0.05, 2.3), (0, 0.575, -0.2))                                # cabin floor, over the cut body
 blk('interior', (1.58, 0.24, 0.46), (0, 0.86, 0.64), bevel=0.05)                     # dashboard (top ≈ 0.98)
 blk('interior', (0.36, 0.12, 0.2), (0.38, 1.02, 0.5), bevel=0.04, rot=(0.3, 0, 0))   # instrument binnacle
-blk('interior', (0.22, 0.30, 1.4), (0, 0.48, -0.1), bevel=0.04)                      # centre tunnel
-bar('cage', (0.0, 0.62, 0.25), (0.0, 0.78, 0.2), 0.012)                               # gear lever
+blk('interior', (0.22, 0.22, 1.4), (0, 0.68, -0.1), bevel=0.04)                      # centre tunnel
+bar('cage', (0.0, 0.78, 0.25), (0.0, 0.94, 0.2), 0.012)                               # gear lever
 for x in (-0.38, 0.38):
-    blk('seat', (0.50, 0.12, 0.50), (x, 0.47, -0.42), bevel=0.05)
+    blk('seat', (0.50, 0.12, 0.50), (x, 0.66, -0.42), bevel=0.05)
     blk('seat', (0.50, 0.66, 0.12), (x, 0.80, -0.70), bevel=0.05, rot=(-0.15, 0, 0))
     blk('interior', (0.30, 0.16, 0.08), (x, 1.17, -0.78), bevel=0.03)              # headrest pad
 for x in (-1, 1):

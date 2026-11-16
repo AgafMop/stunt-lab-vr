@@ -25,12 +25,12 @@ function rockGeo(seed, flat = 0.62) {
   }
   g = g.toNonIndexed(); g.computeVertexNormals();                    // faceted, like the film's stylised rocks
   g.translate(0, 0.25, 0);
-  const base = [[0.62, 0.30, 0.18], [0.74, 0.42, 0.24], [0.55, 0.26, 0.17]][seed % 3];
+  const base = [[0.86, 0.46, 0.27], [0.95, 0.60, 0.36], [0.78, 0.40, 0.25]][seed % 3];
   const f = rand(seed + 9);
   let face = 1;
   return paint(g, (x, y, z, i) => {
     if (i % 3 === 0) face = 0.85 + f() * 0.3;
-    const ao = 0.5 + 0.5 * THREE.MathUtils.smoothstep(y, -0.1, 0.8);
+    const ao = 0.62 + 0.38 * THREE.MathUtils.smoothstep(y, -0.1, 0.8);
     return base.map(v => v * face * ao);
   });
 }

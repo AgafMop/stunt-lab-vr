@@ -5,6 +5,7 @@ import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 export const TEXTURES = {
   red_sand: ['Diffuse', 'nor_gl'],          // plateau ground (has tyre tracks)
   cliff_side: ['Diffuse', 'nor_gl'],        // canyon walls, mesas (orange sediment)
+  gravelly_sand: ['Diffuse', 'nor_gl'],     // patches of gravel on the plateau
   asphalt_02: ['Diffuse', 'nor_gl'],        // braking strip
   asphalt_track: ['Diffuse', 'nor_gl'],     // race track
 };

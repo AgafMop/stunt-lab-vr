@@ -23,7 +23,7 @@ export function clearance(x, z) {
 
 const KINDS = {
   //            count, minR, maxR, clear, scale range
-  rock:       [900, 12, 650, 14, 0.35, 1.6],
+  rock:       [650, 14, 650, 16, 0.35, 1.5],
   boulder:    [140, 20, 900, 30, 2.2, 6.0],
   shrub:      [1000, 10, 500, 12, 0.6, 1.5],
   grass:      [1300, 8, 350, 9, 0.5, 1.2],

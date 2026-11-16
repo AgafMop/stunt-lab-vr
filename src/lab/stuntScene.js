@@ -5,11 +5,14 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { TRACK_DEF, buildTrack } from '../game/track.js';
 import * as L from '../world/layout.js';
 import { loadTerrain } from '../world/terrain.js';
 import { createSky } from '../world/sky.js';
 import { createScatter } from '../world/scatter.js';
+import { createDust } from '../world/dust.js';
 
 export const BUILT = { set: false };      // flip when blender/build_set.py has written assets/set.glb
 
@@ -21,15 +24,30 @@ export const TABLE = { scale: 1 / 70 };
 const mat = (c, r = 0.85, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 
 export async function loadStuntSet(engine) {
+  // light world for the browser tests (software GL renders the terrain shader at ~1.5 s/frame): flat ground + sky,
+  // no shadow map, scatter or dust. ?test defaults to it; ?world=full forces the real world (art review: look.spec.js).
+  const q = new URLSearchParams(location.search);
+  const lite = q.get('world') === 'lite' || (q.has('test') && q.get('world') !== 'full');
   const { scene, renderer } = engine;
   const env = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
   const hazeCol = new THREE.Color(...L.PALETTE.haze);
   scene.background = hazeCol.clone();
   scene.fog = new THREE.Fog(hazeCol, 300, 4200);                   // props only; the terrain has its own haze
   engine.camera.far = 8000; engine.camera.near = 0.04; engine.camera.updateProjectionMatrix();
-  scene.add(new THREE.HemisphereLight(0xd9b6c8, 0x8a4a2c, 0.9));
+  scene.add(new THREE.HemisphereLight(0xe8c0b8, 0xa05a34, 1.7));      // warm sky + red-sand bounce on the shaded sides
   const sun = new THREE.DirectionalLight(new THREE.Color(...L.PALETTE.sun), 2.6);
-  sun.position.set(...L.SUN_DIR.map(v => v * 200)); scene.add(sun);
+  // long low-sun shadows of the set on the flat play area: one 2048 map around the tower and the strip
+  // (lab.focusShadow(x, z) moves it, e.g. to follow the race car)
+  renderer.shadowMap.enabled = !lite; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  sun.castShadow = !lite; sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -95, right: 95, top: 95, bottom: -95, near: 1, far: 900 });
+  sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+  const focusShadow = (x, z) => { sun.target.position.set(x, 0, z); sun.position.set(x + L.SUN_DIR[0] * 400, L.SUN_DIR[1] * 400, z + L.SUN_DIR[2] * 400); sun.target.updateMatrixWorld(); };
+  focusShadow(25, -12);
+  scene.add(sun, sun.target);
+  const catcher = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.ShadowMaterial({ color: 0x3a1206, opacity: 0.5,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+  catcher.rotation.x = -Math.PI / 2; catcher.position.set(25, 0.003, -12); catcher.receiveShadow = true; catcher.name = 'shadowCatcher';
 
   const root = new THREE.Group(); root.name = 'set';
   const world = new THREE.Group(); world.name = 'world';            // hidden in the tabletop RC view
@@ -48,16 +66,23 @@ export async function loadStuntSet(engine) {
 
   // ground: the desert world (terrain + sky stay visible in every view, also the tabletop RC view)
   try {
+    if (lite) throw new Error('light world');
     const terrain = await loadTerrain(engine);
     root.add(terrain);
     createSky(engine);
-    root.add(createScatter(engine));
+    if (!lite) { root.add(createScatter(engine)); root.add(catcher); createDust(engine); }
   } catch (e) {
-    console.warn('terrain unavailable, flat ground', e);
+    if (!lite) console.warn('terrain unavailable, flat ground', e);
+    createSky(engine);
     const ground = mesh(world, new THREE.PlaneGeometry(1400, 1400), mat(0xc98a52), [0, 0, 0], 'ground');
     ground.rotation.x = -Math.PI / 2;
   }
-  mesh(world, new THREE.BoxGeometry(6, 0.3, 30), mat(0xf2f2f2, 0.5), [STRIP.endX - 3, 0.02, STRIP.z], 'stopLineEnd').scale.set(0.05, 1, 0.3);
+  const paint = new THREE.MeshStandardMaterial({ color: 0xf4efe6, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+  const stopLine = mesh(world, new THREE.PlaneGeometry(0.45, STRIP.width - 0.4), paint, [STRIP.endX - 3, 0.012, STRIP.z], 'stopLineEnd');
+  stopLine.rotation.x = -Math.PI / 2; stopLine.receiveShadow = true;
+  const stop = mesh(world, new THREE.PlaneGeometry(5.2, 2.2), new THREE.MeshStandardMaterial({ map: paintedText('STOP'), transparent: true, roughness: 0.8,
+    polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }), [STRIP.endX - 7, 0.012, STRIP.z], 'stopPaint');
+  stop.rotation.set(-Math.PI / 2, 0, -Math.PI / 2); stop.receiveShadow = true;   // reads from a car driving toward the cliff (+x), like the film
 
   // ---- braking strip + ruler + gate ----
   const stripLen = STRIP.endX - STRIP.startX;
@@ -68,6 +93,7 @@ export async function loadStuntSet(engine) {
   asphalt.polygonOffset = true; asphalt.polygonOffsetFactor = -2; asphalt.polygonOffsetUnits = -4;   // never flickers against the ground
   const strip = mesh(world, new THREE.PlaneGeometry(stripLen, STRIP.width), asphalt,
     [(STRIP.startX + STRIP.endX) / 2, 0.01, STRIP.z], 'STRIP_asphalt');
+  strip.receiveShadow = true;
   strip.rotation.x = -Math.PI / 2;
   const ticks = [];
   for (let m = 0; m <= 120; m += 0.5) {
@@ -106,6 +132,14 @@ export async function loadStuntSet(engine) {
   mesh(chair, new THREE.BoxGeometry(0.5, 0.45, 0.04), mat(0x2d2d2d), [0, 0.7, 0.23]);
   const desk = mesh(tower, new THREE.BoxGeometry(1.2, 0.05, 0.3), mat(0x6b4f36), [0, DECK_Y + 0.62, -1.7], 'desk');   // narrow & low: never hides the strip
   void desk;
+  // the Blender-built set (blender/build_set.py → assets/set.glb) replaces the placeholder tower when it loads
+  try {
+    const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('assets/set.glb');
+    for (const name of ['deck', 'towerFrame', 'desk']) tower.getObjectByName(name)?.removeFromParent();
+    chair.clear();
+    gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; if (o.material.name === 'M_lamp') o.material.toneMapped = false; } });
+    gltf.scene.name = 'SET'; tower.add(gltf.scene);
+  } catch (e) { console.warn('set.glb unavailable, placeholder tower', e); }
   empty(root, 'ST_tower', [0, DECK_Y, -1.4], 0).userData.pitch = -0.42;   // desktop: look down at the strip
   empty(root, 'A_board', [0, DECK_Y + 1.02, -2.6], 0);
   empty(root, 'A_radar', [-0.9, DECK_Y + 1.15, -2.4], 0);
@@ -134,7 +168,7 @@ export async function loadStuntSet(engine) {
   root.traverse(o => { if (o.isMesh && o.material.isMeshStandardMaterial) { o.material.envMap = env; o.material.envMapIntensity = 0.3; } });
 
   return {
-    root, world, tower, anchors, stationNodes, discs: {}, env, track, track3d, table, mini,
+    root, world, tower, anchors, stationNodes, discs: {}, env, track, track3d, table, mini, focusShadow, sun,
     strip: {
       gate, ruler,
       rulerZero: new THREE.Vector3(STRIP.gateX, 0, STRIP.z),
@@ -143,6 +177,18 @@ export async function loadStuntSet(engine) {
     },
     makeCar,
   };
+}
+
+/** Worn road paint lettering on transparent canvas. */
+function paintedText(text) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 216;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(244,239,230,0.95)'; g.font = 'bold 190px Heebo, "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 256, 116);
+  g.globalCompositeOperation = 'destination-out';                       // wear
+  for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.5})`; g.fillRect(Math.random() * 512, Math.random() * 216, 2 + Math.random() * 6, 1 + Math.random() * 3); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
 }
 
 function numberSign(text, h) {

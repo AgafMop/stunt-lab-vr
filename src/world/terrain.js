@@ -67,6 +67,7 @@ export async function loadTerrain(engine, { base = 'assets/world/' } = {}) {
       ...hazeUniforms(),
       sandD: { value: tex(L, base + 'tex/red_sand_diff.jpg', true) }, sandN: { value: tex(L, base + 'tex/red_sand_nor.jpg') },
       rockD: { value: tex(L, base + 'tex/cliff_side_diff.jpg', true) }, rockN: { value: tex(L, base + 'tex/cliff_side_nor.jpg') },
+      gravD: { value: tex(L, base + 'tex/gravelly_sand_diff.jpg', true) },
       skyCol: { value: new THREE.Color(0.42, 0.33, 0.50) }, bounceCol: { value: new THREE.Color(0.50, 0.24, 0.14) },
       sunStrength: { value: 4.2 },
     },
@@ -79,7 +80,7 @@ export async function loadTerrain(engine, { base = 'assets/world/' } = {}) {
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
     fragmentShader: /* glsl */`
-      uniform sampler2D sandD, sandN, rockD, rockN;
+      uniform sampler2D sandD, sandN, rockD, rockN, gravD;
       uniform vec3 skyCol, bounceCol; uniform float sunStrength;
       varying vec3 vW, vN; varying vec2 vL;
       ${HAZE_GLSL}
@@ -92,21 +93,28 @@ export async function loadTerrain(engine, { base = 'assets/world/' } = {}) {
         vec2 sp = vW.xz;
         vec3 sand = texture2D(sandD, sp / 5.0).rgb * 0.6 + texture2D(sandD, sp / 23.0 + 0.37).rgb * 0.4;
         float macro = texture2D(rockD, sp / 900.0).g;
-        sand *= mix(vec3(1.30, 1.02, 0.78), vec3(1.45, 1.12, 0.80), macro);
+        sand *= mix(vec3(1.32, 1.08, 0.86), vec3(1.48, 1.20, 0.92), macro);
+        // gravel patches and wind-swept lighter sand (breaks up the flat plateau)
+        float patchN = texture2D(rockD, sp / 260.0 + 0.5).r * 0.7 + texture2D(rockD, sp / 70.0).b * 0.3;
+        float gw = smoothstep(0.42, 0.55, patchN) * 0.85;
+        if (gw > 0.01) sand = mix(sand, texture2D(gravD, sp / 3.0).rgb * vec3(1.25, 1.0, 0.85), gw);
+        sand = mix(sand, sand * vec3(1.18, 1.12, 1.05), smoothstep(0.62, 0.75, 1.0 - patchN));
+        sand = mix(vec3(dot(sand, vec3(0.3, 0.55, 0.15))), sand, 0.62) * vec3(1.12, 0.98, 0.86);   // less brick-red, more film ochre
         vec3 sN = nmap(sandN, sp / 5.0);
         // ---- rock: triplanar + sediment bands by height ----
-        vec3 bw = pow(abs(n), vec3(6.0)); bw /= (bw.x + bw.y + bw.z);
-        float sc = 1.0 / 14.0;
-        vec3 rock = texture2D(rockD, vW.zy * sc).rgb * bw.x + texture2D(rockD, vW.xy * sc).rgb * bw.z + texture2D(rockD, vW.xz * sc).rgb * bw.y;
-        vec3 rn = nmap(rockN, vW.zy * sc) * bw.x + nmap(rockN, vW.xy * sc) * bw.z;
-        float band = vW.y / 9.0 + texture2D(rockD, vW.xz / 600.0).r * 1.5;
-        float b = fract(band);
-        vec3 tint = mix(vec3(1.25, 0.62, 0.40), vec3(1.30, 0.95, 0.70), smoothstep(0.55, 0.62, b) * (1.0 - smoothstep(0.80, 0.88, b)));
-        tint = mix(tint, vec3(0.95, 0.45, 0.32), smoothstep(0.15, 0.2, b) * (1.0 - smoothstep(0.32, 0.38, b)));
-        rock *= tint;
-        vec3 albedo = mix(sand, rock, rockW);
-        // detail normal (cheap: tilt the geometric normal)
-        vec3 dn = mix(vec3(sN.x, 0.0, sN.y) * 0.35, vec3(rn.x, rn.y, 0.0) * 0.6, rockW);
+        vec3 albedo = sand, dn = vec3(sN.x, 0.0, sN.y) * 0.35;
+        if (rockW > 0.01) {                                 // only on slopes: most of the screen is flat sand
+          vec3 bw = pow(abs(n), vec3(6.0)); bw /= (bw.x + bw.y + bw.z);
+          float sc = 1.0 / 14.0;
+          vec3 rock = texture2D(rockD, vW.zy * sc).rgb * bw.x + texture2D(rockD, vW.xy * sc).rgb * bw.z + texture2D(rockD, vW.xz * sc).rgb * bw.y;
+          vec3 rn = nmap(rockN, vW.zy * sc) * bw.x + nmap(rockN, vW.xy * sc) * bw.z;
+          float band = vW.y / 9.0 + texture2D(rockD, vW.xz / 600.0).r * 1.5;
+          float b = fract(band);
+          vec3 tint = mix(vec3(1.25, 0.62, 0.40), vec3(1.30, 0.95, 0.70), smoothstep(0.55, 0.62, b) * (1.0 - smoothstep(0.80, 0.88, b)));
+          tint = mix(tint, vec3(0.95, 0.45, 0.32), smoothstep(0.15, 0.2, b) * (1.0 - smoothstep(0.32, 0.38, b)));
+          albedo = mix(sand, rock * tint, rockW);
+          dn = mix(dn, vec3(rn.x, rn.y, 0.0) * 0.6, rockW);
+        }
         vec3 nd = normalize(n + dn);
         // ---- light: baked sun visibility + sky AO ----
         float sunVis = vL.x, ao = vL.y;

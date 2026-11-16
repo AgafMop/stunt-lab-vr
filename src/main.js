@@ -21,6 +21,8 @@ import * as chStrip from './chapters/ch_strip.js';
 import * as chIntro from './chapters/ch_intro.js';
 import { createIntroVideo, primeIntroVideo } from './lab/introCinema.js';
 import { createGuide } from './ui/guide.js';
+import { createBumper } from './world/bumper.js';
+import { DECK_Y } from './world/layout.js';
 
 const CH = { intro: chIntro, race: chRace, strip: chStrip, end: chEnd };
 const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', strip: 'נסיעת מבחן', end: 'סיכום' };
@@ -98,6 +100,12 @@ const $ = id => document.getElementById(id);
 async function boot() {
   ctx.lab = await loadStuntSet(engine);
   { const g = createGuide(ctx); ctx.task = g.task; ctx.attention = g.attention; ctx.taskLog = []; }
+  // Bumper stands on the tower deck behind-right of the chair (≈118° from straight ahead), turned to the student: the
+  // strip spans ≈ −85°…+83° below the eyes, so anywhere further forward he would hide part of it or the cliff end
+  ctx.bumper = createBumper(engine, audio);
+  ctx.bumper.position.set(1.5, DECK_Y, -0.6); ctx.bumper.rotation.y = Math.atan2(-1.5, -0.8);
+  ctx.lab.tower.add(ctx.bumper);
+  { const cam = new THREE.Vector3(); ctx.bumper.userData.lookAt(() => engine.camera.getWorldPosition(cam)); }
   if (wantsFilm()) ctx.introVideo = createIntroVideo();   // preload while the set loads
   ctx.loco = createLocomotion(engine, input, { room: { x0: -1.7, x1: 1.7, z0: -1.7, z1: 1.7 }, blocks: [[-0.7, 0.7, -0.75, -0.15]] });
   for (const id of ['tower', 'pit']) if (ctx.lab.stationNodes[id]) ctx.loco.addStation(id, ctx.lab.stationNodes[id], ctx.lab.discs[id]);

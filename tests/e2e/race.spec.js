@@ -24,6 +24,10 @@ test('race: choice, three valid starts, lap completes', async ({ page }) => {
   for (const r of s.reaction.simple) { expect(r).toBeGreaterThanOrEqual(0.2); expect(r).toBeLessThanOrEqual(0.4); }
   expect(s.reaction.falseStarts).toBe(0);
   expect(s.flags.lapDone).toBe(true);
+  // the reaction time is explained with the student's own mean and what it costs at 50 km/h (spec: d_r = v·t_r)
+  expect(s.reaction.mean).toBeCloseTo(s.reaction.simple.reduce((a, b) => a + b) / 3, 3);
+  expect(s.flags.reactionExplained).toBeCloseTo(50 / 3.6 * s.reaction.mean, 2);
+  expect(s.flags.assist).toBe(true);                       // steering help on by default
   expect(s.text).toEqual([]);
   expect(s.motion).toEqual([]);
   for (const [ch, b] of Object.entries(s.budget)) expect(b.calls, `${ch} draw calls`).toBeLessThanOrEqual(150);

@@ -22,7 +22,7 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
 
   const stepper = createStepper(h => {
     const surface = surfaceAt(track, car.x, car.z);
-    stepCar(car, frozen ? { throttle: 0, brake: 1, steer: 0 } : driver ? driver(car) : cur, h, surface);
+    stepCar(car, frozen ? { throttle: 0, brake: 1, steer: 0 } : driver ? driver(car, cur) : cur, h, surface);
     car.offTrack = surface === 'sand' ? car.offTrack + h : 0;
     car.surface = surface;
     for (const fn of stepListeners) fn(car, h);

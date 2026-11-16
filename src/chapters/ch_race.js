@@ -9,6 +9,7 @@ import { createDriveSession } from '../core/driveSession.js';
 import { autopilot } from '../game/autopilot.js';
 import { classifyStart, makeRng } from '../game/model.js';
 import { START_DRILLS, LIGHTS, GHOST_SPEED, WET_RUSH } from '../game/config.js';
+import { reactionDistance } from '../game/model.js';
 
 const AUTO_REACTION_MS = 250;
 
@@ -101,6 +102,31 @@ export async function run(ctx, scope) {
   }
   lights.visible = false;
 
+  // ---- 2b. what the reaction time MEANS (spec §6: d_r = v · t_r) — it is used again on the strip and in the stunt ----
+  const tr = game.s.reaction.mean = game.s.reaction.simple.reduce((a, b) => a + b, 0) / game.s.reaction.simple.length;
+  const blind = reactionDistance(50, tr);
+  game.s.flags.reactionExplained = blind;
+  {
+    const g = boardAtStation(ctx, scope, 'tower', { dist: 1.05, height: 1.3 }); g.name = 'reactionCard';
+    const f1 = n => n.toFixed(2), f0 = n => n.toFixed(1);
+    const card = scope.add(ui.panel({ w: 0.82, h: 0.44, name: 'reactionCard', viewDist: 1.05, draw(c, W, H) {
+      ui.rr(c, 6, 6, W - 12, H - 12, 30); c.fillStyle = ui.C.bg; c.fill(); c.lineWidth = 6; c.strokeStyle = '#FFB347'; c.stroke();
+      const mp = ui.minPx(900, 1.05), F = ui.FONT;
+      c.fillStyle = '#FFB347'; ui.fitText(c, 'זמן התגובה שלך', { x: 30, y: 16, w: W - 60, h: H * 0.13, maxPx: H * 0.1, minPx: mp, font: F });
+      c.fillStyle = ui.C.ink; ui.fitText(c, `⁦${f1(tr)}⁩ שניות`, { x: 30, y: H * 0.17, w: W - 60, h: H * 0.2, maxPx: H * 0.17, minPx: mp, font: F, weight: 800 });
+      ui.fitText(c, `ב-⁦50⁩ קמ״ש הרכב נוסע עוד ⁦${f0(blind)}⁩ מטר לפני שהרגל בכלל לוחצת על הבלם.`, { x: 30, y: H * 0.42, w: W - 60, h: H * 0.2, maxPx: H * 0.08, minPx: mp, font: F, weight: 600 });
+      c.fillStyle = '#9FB0C8'; ui.fitText(c, 'זה "מרחק התגובה". בכביש אמיתי, כשלא יודעים מתי משהו יקרה, זמן התגובה ארוך פי 3–4.', { x: 30, y: H * 0.64, w: W - 60, h: H * 0.18, maxPx: H * 0.065, minPx: mp, font: F, weight: 500 });
+    } }));
+    g.add(card.mesh);
+    const ok = scope.add(ui.button3d('הבנתי! להקפה', () => {}, { w: 0.34, h: 0.09, viewDist: 1.05 }));
+    ok.mesh.position.set(0, -0.29, 0.01); g.add(ok.mesh);
+    ctx.task?.set('race_reaction');
+    await scope.say('race_reaction1');
+    await scope.say('race_reaction2');
+    await scope.waitSelect(ok.mesh);
+    g.visible = false;
+  }
+
   // ---- 3. one lap against Bumper ----
   const track = drive.track;
   const ghost = ctx.lab.makeCar(0x3cc4bc); ctx.lab.world.add(ghost); scope.add(ghost);
@@ -129,7 +155,15 @@ export async function run(ctx, scope) {
     if (progress >= track.length - 3) done = true;
   });
   scope.add(offStep);
+  // steering help (default on, ?assist=off): the car holds the racing line, the student drives gas and brake; a firm
+  // turn of the wheel/stick overrides it. The wet-corner lesson still happens: friction, not steering, limits the turn.
+  const assist = params.get('assist') !== 'off';
+  game.s.flags.assist = assist;
   if (ctx.auto) drive.setDriver(car => autopilot(car, track, 15));
+  else if (assist) drive.setDriver((car, cur) => {
+    const ap = autopilot(car, track, 99);
+    return { throttle: cur.throttle, brake: cur.brake, steer: Math.abs(cur.steer) > 0.25 ? cur.steer : ap.steer };
+  });
   drive.freeze(false);
   ctx.task?.set('race_lap');
   await scope.say('race_go');

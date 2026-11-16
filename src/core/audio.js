@@ -68,6 +68,7 @@ export function createAudio(ui, { fast = false } = {}) {
   const setFast = v => { fast = v; };
   let current = null;   // { el, finish } — the line now playing
 
+  let speaking = null;
   return {
     sfx(name, arg) { try { SFX[name]?.(arg); } catch { /* audio blocked */ } },
     unlock: ac,
@@ -79,15 +80,17 @@ export function createAudio(ui, { fast = false } = {}) {
       const l = LINES[id];
       if (!l) return Promise.resolve();
       const ms = Math.max(1600, l.text.split(/\s+/).length * 380);
+      const token = {}; speaking = { speaker: l.speaker, token };
+      const done = () => { if (speaking?.token === token) speaking = null; };
       if (current) { const c = current; current = null; try { c.el?.pause(); } catch { /* gone */ } c.finish(); }
       if (!VOICE_AVAILABLE.has(id) || fast) {
         ui.subtitles.show(l.speaker, l.text, ms + 600);
-        return wait(ms);
+        return wait(ms).then(done);
       }
       ui.subtitles.show(l.speaker, l.text, 60000);          // stays up until the voice actually ends
       return new Promise(res => {
-        let done = false;
-        const me = { el: null, finish: () => { if (!done) { done = true; res(); } } };
+        let fin = false;
+        const me = { el: null, finish: () => { if (!fin) { fin = true; done(); res(); } } };
         const end = () => { if (current === me) { current = null; ui.subtitles.hide(); } me.finish(); };
         const fallback = () => { if (current === me) { ui.subtitles.show(l.speaker, l.text, ms + 600); wait(ms).then(end); } };
         const el = new Audio(`assets/voice/${id}.mp3`); me.el = el; current = me;
@@ -96,5 +99,7 @@ export function createAudio(ui, { fast = false } = {}) {
       });
     },
     wait,
+    /** { speaker } while a line is being spoken (characters animate their mouths), else null. */
+    get speaking() { return speaking; },
   };
 }

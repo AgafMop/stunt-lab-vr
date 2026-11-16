@@ -28,6 +28,7 @@ import * as chRoad from './chapters/ch_road.js';
 import { createIntroVideo, primeIntroVideo } from './lab/introCinema.js';
 import { createGuide } from './ui/guide.js';
 import { createBumper } from './world/bumper.js';
+import { enablePcQuality } from './world/pcQuality.js';
 import { DECK_Y } from './world/layout.js';
 
 const CH = { intro: chIntro, race: chRace, belt: chBelt, plan: chPlan, strip: chStrip, graph: chGraph, surfaces: chSurfaces, stunt: chStunt, road: chRoad, end: chEnd };
@@ -106,6 +107,15 @@ const $ = id => document.getElementById(id);
 async function boot() {
   ctx.lab = await loadStuntSet(engine);
   { const g = createGuide(ctx); ctx.task = g.task; ctx.attention = g.attention; ctx.taskLog = []; }
+  // the PC showcase tier (desktop): bloom, film grade, 4096 shadows. Never in ?test (unless ?quality=pc), never in XR.
+  const q = params.get('quality');
+  if (q === 'pc' || (!TEST && q !== 'quest')) {
+    ctx.pc = enablePcQuality(engine, ctx.lab);
+    const sun = ctx.lab.sun;
+    const setShadow = n => { if (sun?.shadow) { sun.shadow.mapSize.set(n, n); sun.shadow.map?.dispose(); sun.shadow.map = null; } };
+    engine.renderer.xr.addEventListener('sessionstart', () => setShadow(2048));     // the headset keeps the lean path
+    engine.renderer.xr.addEventListener('sessionend', () => setShadow(4096));
+  }
   // Bumper stands on the tower deck behind-right of the chair (≈118° from straight ahead), turned to the student: the
   // strip spans ≈ −85°…+83° below the eyes, so anywhere further forward he would hide part of it or the cliff end
   ctx.bumper = createBumper(engine, audio);

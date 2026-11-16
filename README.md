@@ -19,14 +19,17 @@ npx playwright test -g "strip:"
 npx playwright test -g "full game"
 ```
 
-## What is in the spike
-- **Opening film** (chapter `intro`, ~74 s): nine AI-generated shots on a big screen, Hebrew subtitles (voices later).
-  Rebuild after changing a shot or a cut: `node tools/build-intro.mjs` (needs ffmpeg and the raw clips in
-  `assets/film/raw/`, which are not in git). Timeline and cues: `src/game/introVideo.js`. Skippable after 3 s.
-- **Race** (chapter `race`): choose the view (in the car / remote control from the tower), 3 start-light drills that
-  measure the student's real reaction time (false starts don't count), one lap against Bumper with a wet corner.
-- **Strip** (chapter `strip`): one brake test — pick a speed, optionally ride along, clapper "Action!", the car stops
-  exactly where the science model says; read the radar and the ruler (drone zoom).
+## The experiment (chapters, `src/game/config.js` → CHAPTERS)
+0. **intro** — the opening film. 1. **race** — view choice, 3 start-light drills (YOUR reaction time, explained: metres
+"blind" at 50 km/h), a lap with steering assist (`?assist=off`). 2. **belt** — the dummy with/without a belt (Newton 1,
+ride next to Bumper), the tyre zoom with force arrows (Newton 2/3), "who stops the car? the road". 3. **plan** —
+hypothesis sentence, matching graph, variable sorting. 4. **strip** — the main experiment: 3 repeats at 40, picked
+speeds by the crew, the sprinkler outlier (disqualify). 5. **graph** — ×2 speed → ×4 braking from your data,
+hypothesis supported or not, energy cubes. 6. **surfaces** — dry / wet / sand / oil at 70, ranking. 7. **stunt** —
+reaction + braking place the red lamp; Roni drives; the cliff + parachute if wrong. 8. **road** — rain, phone, tyres,
+self-driving. Then the summary in your own numbers.
+`?only=<chapter>` plays one chapter with earlier results filled in; `?demo` "next stage" fills a skipped chapter.
+`?quality=quest` turns off the PC showcase tier (bloom, film grade, 4096 shadows), which is on for desktop by default.
 
 ## The world (art)
 - Desert canyon at golden hour, one sun for everything (`src/world/layout.js`). Terrain: `src/world/terrainFn.js`

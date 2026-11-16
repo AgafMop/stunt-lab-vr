@@ -35,7 +35,10 @@ export function rimX(z) {
   const away = ss(60, 260, Math.abs(z - STRIP.z));
   return RIM_X + away * 75 * (0.5 + 0.5 * fbm(z / 210, 3.7, 3, 11));
 }
-export function farRimX(z) { return 420 + 40 * fbm(z / 240, 9.1, 3, 23) + 16 * fbm(z / 45, 2.3, 2, 29); }   // bays and buttresses
+export function farRimX(z) {                       // bays, buttresses and a few deep side canyons (shadows → depth)
+  const bays = 55 * Math.max(0, fbm(z / 130, 4.2, 3, 37)) ** 1.5;
+  return 420 + 40 * fbm(z / 240, 9.1, 3, 23) + 22 * fbm(z / 45, 2.3, 2, 29) + bays;
+}
 
 // cross-section below a rim, t = metres into the canyon: sheer cliff, talus ledge, second cliff, slopes, floor
 function wall(t, z) {

@@ -36,16 +36,19 @@ export function createEngine(el) {
 
   const frameFns = new Set(), afterFns = new Set();
   const clock = new THREE.Clock();
+  let drawFn = null;                                   // a desktop post-processing pipeline may take over the draw
   renderer.setAnimationLoop(() => {
     const dt = Math.min(0.05, clock.getDelta());
     for (const fn of frameFns) fn(dt);
-    renderer.render(scene, camera);
+    if (drawFn && !renderer.xr.isPresenting) drawFn(dt); else renderer.render(scene, camera);
     for (const fn of afterFns) fn();
   });
 
   const engine = {
     THREE, renderer, scene, camera, rig, clock,
     onFrame(fn) { frameFns.add(fn); return () => frameFns.delete(fn); },
+    /** Desktop only: draw the frame with fn(dt) instead of renderer.render (XR always renders directly). */
+    setDraw(fn) { drawFn = fn; },
     /** Runs right after each render (the canvas still holds the frame). */
     onAfterRender(fn) { afterFns.add(fn); return () => afterFns.delete(fn); },
     isXR: () => renderer.xr.isPresenting,

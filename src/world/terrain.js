@@ -100,6 +100,9 @@ export async function loadTerrain(engine, { base = 'assets/world/' } = {}) {
         if (gw > 0.01) sand = mix(sand, texture2D(gravD, sp / 3.0).rgb * vec3(1.25, 1.0, 0.85), gw);
         sand = mix(sand, sand * vec3(1.18, 1.12, 1.05), smoothstep(0.62, 0.75, 1.0 - patchN));
         sand = mix(vec3(dot(sand, vec3(0.3, 0.55, 0.15))), sand, 0.62) * vec3(1.12, 0.98, 0.86);   // less brick-red, more film ochre
+        // large soft patches: pale wind-blown sand, darker red earth (breaks the uniform plateau)
+        float big = texture2D(rockD, sp / 1400.0 + 0.21).r;
+        sand *= mix(vec3(0.82, 0.74, 0.70), vec3(1.16, 1.08, 0.96), smoothstep(0.25, 0.75, big));
         vec3 sN = nmap(sandN, sp / 5.0);
         // ---- rock: triplanar + sediment bands by height ----
         vec3 albedo = sand, dn = vec3(sN.x, 0.0, sN.y) * 0.35;
@@ -108,7 +111,7 @@ export async function loadTerrain(engine, { base = 'assets/world/' } = {}) {
           float sc = 1.0 / 14.0;
           vec3 rock = texture2D(rockD, vW.zy * sc).rgb * bw.x + texture2D(rockD, vW.xy * sc).rgb * bw.z + texture2D(rockD, vW.xz * sc).rgb * bw.y;
           vec3 rn = nmap(rockN, vW.zy * sc) * bw.x + nmap(rockN, vW.xy * sc) * bw.z;
-          float band = vW.y / 9.0 + texture2D(rockD, vW.xz / 600.0).r * 1.5;
+          float band = vW.y / (7.0 + 4.0 * texture2D(rockD, vW.xz / 900.0).g) + texture2D(rockD, vW.xz / 300.0).r * 2.2;   // bands wander in height and thickness
           float b = fract(band);
           vec3 tint = mix(vec3(1.25, 0.62, 0.40), vec3(1.30, 0.95, 0.70), smoothstep(0.55, 0.62, b) * (1.0 - smoothstep(0.80, 0.88, b)));
           tint = mix(tint, vec3(0.95, 0.45, 0.32), smoothstep(0.15, 0.2, b) * (1.0 - smoothstep(0.32, 0.38, b)));

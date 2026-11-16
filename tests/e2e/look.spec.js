@@ -18,7 +18,7 @@ test('look: fixed viewpoints of the world', async ({ page }) => {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto('/?test&nogame&fresh&world=full');
+  await page.goto('/?test&nogame&fresh&world=full' + (process.env.LOOK_Q ? '&quality=' + process.env.LOOK_Q : ''));
   await expect(page.locator('#enter')).toBeEnabled({ timeout: 120_000 });
   await page.click('#enter');
   await page.waitForFunction(() => window.__ctx?.ready === true);

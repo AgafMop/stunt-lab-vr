@@ -42,3 +42,6 @@ Task 7: complete (ch graph)
 Task 8: complete (ch surfaces; ruler 140 m)
 Task 9: complete (ch stunt)
 Task 10: complete (ch road + end summary; full game e2e passes)
+Task 11: partial — 73/115 voiced; credits exhausted (key #2); 42 subtitle-only; niqqud ready for 3 garbled
+Task 12: complete (PC tier; Quest budget re-check: cockpit 114 calls / 395k tris, strip 75 / 381k)
+Task 13: suite green (unit 53; boots, intro, race, drive, strip, chapter, clarity, full game, tour, world); push blocked by permissions — awaiting the user

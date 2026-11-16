@@ -6,12 +6,16 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TRACK_DEF, buildTrack } from '../game/track.js';
+import * as L from '../world/layout.js';
+import { loadTerrain } from '../world/terrain.js';
+import { createSky } from '../world/sky.js';
+import { createScatter } from '../world/scatter.js';
 
 export const BUILT = { set: false };      // flip when blender/build_set.py has written assets/set.glb
 
-export const DECK_Y = 6;                  // tower deck height
-export const STRIP = { z: -14, gateX: -30, startX: -140, endX: 100, width: 8 };
-export const TRACK_ORIGIN = new THREE.Vector3(60, 0, -260);   // where track.js (0,0) sits in the world
+export const DECK_Y = L.DECK_Y;           // tower deck height (layout: src/world/layout.js)
+export const STRIP = L.STRIP;
+export const TRACK_ORIGIN = new THREE.Vector3(L.TRACK_ORIGIN.x, L.TRACK_ORIGIN.y, L.TRACK_ORIGIN.z);   // where track.js (0,0) sits
 export const TABLE = { scale: 1 / 70 };
 
 const mat = (c, r = 0.85, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
@@ -19,10 +23,13 @@ const mat = (c, r = 0.85, m = 0) => new THREE.MeshStandardMaterial({ color: c, r
 export async function loadStuntSet(engine) {
   const { scene, renderer } = engine;
   const env = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.background = new THREE.Color(0xe9a46a);                    // sunset haze
-  scene.fog = new THREE.Fog(0xe9a46a, 120, 520);
-  scene.add(new THREE.HemisphereLight(0xffd7b0, 0x6b3f2a, 1.1));
-  const sun = new THREE.DirectionalLight(0xffc68a, 1.8); sun.position.set(-60, 40, -120); scene.add(sun);
+  const hazeCol = new THREE.Color(...L.PALETTE.haze);
+  scene.background = hazeCol.clone();
+  scene.fog = new THREE.Fog(hazeCol, 300, 4200);                   // props only; the terrain has its own haze
+  engine.camera.far = 8000; engine.camera.near = 0.04; engine.camera.updateProjectionMatrix();
+  scene.add(new THREE.HemisphereLight(0xd9b6c8, 0x8a4a2c, 0.9));
+  const sun = new THREE.DirectionalLight(new THREE.Color(...L.PALETTE.sun), 2.6);
+  sun.position.set(...L.SUN_DIR.map(v => v * 200)); scene.add(sun);
 
   const root = new THREE.Group(); root.name = 'set';
   const world = new THREE.Group(); world.name = 'world';            // hidden in the tabletop RC view
@@ -39,15 +46,27 @@ export async function loadStuntSet(engine) {
     const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); if (name) o.name = name; parent.add(o); return o;
   };
 
-  // ground + cliff
-  const ground = mesh(world, new THREE.PlaneGeometry(1400, 1400), mat(0xc98a52), [0, 0, 0], 'ground');
-  ground.rotation.x = -Math.PI / 2;
-  mesh(world, new THREE.BoxGeometry(30, 40, 60), mat(0x9c4a2c), [STRIP.endX + 15, -20.02, STRIP.z], 'cliffGap');   // dark drop
+  // ground: the desert world (terrain + sky stay visible in every view, also the tabletop RC view)
+  try {
+    const terrain = await loadTerrain(engine);
+    root.add(terrain);
+    createSky(engine);
+    root.add(createScatter(engine));
+  } catch (e) {
+    console.warn('terrain unavailable, flat ground', e);
+    const ground = mesh(world, new THREE.PlaneGeometry(1400, 1400), mat(0xc98a52), [0, 0, 0], 'ground');
+    ground.rotation.x = -Math.PI / 2;
+  }
   mesh(world, new THREE.BoxGeometry(6, 0.3, 30), mat(0xf2f2f2, 0.5), [STRIP.endX - 3, 0.02, STRIP.z], 'stopLineEnd').scale.set(0.05, 1, 0.3);
 
   // ---- braking strip + ruler + gate ----
   const stripLen = STRIP.endX - STRIP.startX;
-  const strip = mesh(world, new THREE.PlaneGeometry(stripLen, STRIP.width), mat(0x3a3a40, 0.95),
+  const asphalt = mat(0x9a9aa2, 0.95);
+  asphalt.map = new THREE.TextureLoader().load('assets/world/tex/asphalt_02_diff.jpg');
+  asphalt.map.colorSpace = THREE.SRGBColorSpace; asphalt.map.wrapS = asphalt.map.wrapT = THREE.RepeatWrapping;
+  asphalt.map.repeat.set(stripLen / 4, STRIP.width / 4); asphalt.map.anisotropy = 8;
+  asphalt.polygonOffset = true; asphalt.polygonOffsetFactor = -2; asphalt.polygonOffsetUnits = -4;   // never flickers against the ground
+  const strip = mesh(world, new THREE.PlaneGeometry(stripLen, STRIP.width), asphalt,
     [(STRIP.startX + STRIP.endX) / 2, 0.01, STRIP.z], 'STRIP_asphalt');
   strip.rotation.x = -Math.PI / 2;
   const ticks = [];
@@ -57,7 +76,7 @@ export async function loadStuntSet(engine) {
     g.rotateX(-Math.PI / 2); g.translate(STRIP.gateX + m, 0.02, STRIP.z + STRIP.width / 2 - (major ? 1.1 : mid ? 0.6 : 0.3));
     ticks.push(g);
   }
-  const ruler = mesh(world, mergeGeometries(ticks), new THREE.MeshBasicMaterial({ color: 0xffffff }), [0, 0, 0], 'STRIP_ruler');
+  const ruler = mesh(world, mergeGeometries(ticks), new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }), [0, 0, 0], 'STRIP_ruler');
   ruler.userData.pickable = true;
   // number signs every 10 m on the far side, sized for the tower view (≈ 1.4° letter height)
   const towerEye = new THREE.Vector3(0, DECK_Y + 1.17, -1.4);
@@ -162,7 +181,7 @@ function trackMesh(track) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.setIndex(idx); geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }));
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
   m.name = 'track';
   return m;
 }

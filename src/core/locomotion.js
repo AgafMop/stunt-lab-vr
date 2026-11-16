@@ -82,6 +82,8 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
     lock(v) { locked = v; },
     /** Desktop look pitch (rad); ignored in XR. */
     setPitch(p) { if (!engine.isXR()) pitch = p; },
+    /** Desktop: set the view direction (yaw: 0 = station facing, + = left). Used by the art-review screenshots. */
+    look(y, p) { if (!engine.isXR()) { yaw = y; pitch = p; } },
     get locked() { return locked; },
     /** fn() → { pos: Vector3 (eye, world), yaw } or null to stop following. */
     follow(fn) { followFn = fn; lookYaw = 0; if (fn) { captureCalib(); loco.applyFollow(); } },

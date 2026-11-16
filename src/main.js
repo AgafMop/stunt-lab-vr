@@ -18,9 +18,11 @@ import { sampleRun, makeRng } from './game/model.js';
 import * as chEnd from './chapters/ch_end.js';
 import * as chRace from './chapters/ch_race.js';
 import * as chStrip from './chapters/ch_strip.js';
+import * as chIntro from './chapters/ch_intro.js';
+import { createIntroVideo, primeIntroVideo } from './lab/introCinema.js';
 
-const CH = { race: chRace, strip: chStrip, end: chEnd };
-const CH_NAMES = { race: 'מבחן הקבלה', strip: 'נסיעת מבחן', end: 'סיכום' };
+const CH = { intro: chIntro, race: chRace, strip: chStrip, end: chEnd };
+const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', strip: 'נסיעת מבחן', end: 'סיכום' };
 
 const params = new URLSearchParams(location.search);
 const TEST = params.has('test');
@@ -94,6 +96,7 @@ const $ = id => document.getElementById(id);
 
 async function boot() {
   ctx.lab = await loadStuntSet(engine);
+  if (wantsFilm()) ctx.introVideo = createIntroVideo();   // preload while the set loads
   ctx.loco = createLocomotion(engine, input, { room: { x0: -1.7, x1: 1.7, z0: -1.7, z1: 1.7 }, blocks: [[-0.7, 0.7, -0.75, -0.15]] });
   for (const id of ['tower', 'pit']) if (ctx.lab.stationNodes[id]) ctx.loco.addStation(id, ctx.lab.stationNodes[id], ctx.lab.discs[id]);
   await ctx.loco.goTo('tower', { fade: false });
@@ -106,9 +109,18 @@ async function boot() {
   if (navigator.xr && await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)) $('enterVR').hidden = false;
 }
 
+/** Load the opening film only when the intro chapter will run and play it. */
+function wantsFilm() {
+  if (params.has('nogame') || params.has('fx') || (AUTO && !params.has('film'))) return false;
+  const only = params.get('only');
+  if (only) return only === 'intro';
+  return !(saved?.chapter && CH[saved.chapter] && saved.chapter !== 'intro');
+}
+
 async function start(vr) {
   $('boot').hidden = true;
   audio.unlock();                 // inside the click: browsers only allow sound after a gesture
+  if (!ctx.started) primeIntroVideo(ctx.introVideo);
   if (vr) {
     try {
       const session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] });

@@ -7,7 +7,7 @@ export const DECISION_SCORE = 100;     // a correct scientific judgement call (d
 export const RESERVE = 240;            // after a second game over in the same chapter, refill to this (nobody gets stuck)
 export const GAMEOVER_SCORE = 100;
 export const REPEATS = 3;              // repeats per condition
-export const CHAPTERS = ['race', 'strip', 'end'];          // run order; every id needs a module in main.js → CH
+export const CHAPTERS = ['intro', 'race', 'strip', 'end'];          // run order; every id needs a module in main.js → CH
 export const SAVE_KEY = 'stuntlab.v1';    // change per project (two labs on one origin must not share saves)
 
 export const START_DRILLS = 3;         // valid start-light reactions recorded in the race

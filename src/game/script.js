@@ -11,8 +11,18 @@ export const SPEAKERS = {
 // (niqqud on homographs, units spelled out: "20 מ״ל" → "עשרים מִילִילִיטֶר")
 const b = (text, say) => ({ speaker: 'bumper', text, ...(say ? { say } : {}) });
 const d = (text, say) => ({ speaker: 'dana', text, ...(say ? { say } : {}) });
+const r = (text, say) => ({ speaker: 'roni', text, ...(say ? { say } : {}) });
 
 export const LINES = {
+  // opening film (timeline: src/game/introVideo.js)
+  intro_scene: d('הסצנה האחרונה של הסרט: רכב דוהר לצוק, ועוצר בדיוק על הקו!'),
+  intro_line: d('על הקו הלבן. לא מטר אחריו.'),
+  intro_action: d('אקשן!'),
+  intro_bumper: b('בלמתי! פשוט... קצת מאוחר מדי.'),
+  intro_roni: r('מי חישב איפה לבלום? בלי פיזיקה, אני לא עולה לרכב.'),
+  intro_sun: d('השמש יורדת. נשארו לנו כמה שעות של אור.'),
+  intro_chair: d('אתם היועצים החדשים? הכיסא שלכם. קודם, מבחן קבלה.'),
+
   // race (chapter 1)
   race_choose: b('איך נוהגים היום? מתוך הרכב, או בשלט מהמגדל?'),
   race_controllers: b('כדי לנהוג צריך את הבקרים. הרימו אותם, אחד בכל יד.'),

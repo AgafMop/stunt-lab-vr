@@ -26,7 +26,7 @@ export function noiseTexture(size = 256, octaves = 5, seed = 7) {
   return t;
 }
 
-export function createSky(engine, noise = noiseTexture()) {
+export function createSky(engine, parent = engine.scene, noise = noiseTexture()) {
   const mat = new THREE.ShaderMaterial({
     name: 'sky',
     side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
@@ -77,6 +77,6 @@ export function createSky(engine, noise = noiseTexture()) {
   dome.name = 'sky'; dome.renderOrder = -1000; dome.frustumCulled = false;
   const p = new THREE.Vector3();
   dome.onBeforeRender = (r, s, cam) => { dome.position.copy(cam.getWorldPosition(p)); dome.updateMatrixWorld(); };
-  engine.scene.add(dome);
+  parent.add(dome);                                  // under the set root: the intro cinema hides it with the set
   return dome;
 }

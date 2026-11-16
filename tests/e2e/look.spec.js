@@ -10,7 +10,6 @@ const VIEWS = [
   ['tower-back', 'tower', 3.0, -0.1],
   ['pit', 'pit', 0, -0.05],
   ['tower-end', 'tower', -1.05, -0.32],
-  ['set-overview', 'pit', 0, 0],
 ];
 
 test('look: fixed viewpoints of the world', async ({ page }) => {
@@ -26,12 +25,9 @@ test('look: fixed viewpoints of the world', async ({ page }) => {
   await page.evaluate(() => { document.getElementById('hint').hidden = true; });
   for (const [name, st, yaw, pitch] of VIEWS) {
     await page.evaluate(async ([st, yaw, pitch]) => {
-      const { loco, engine } = window.__ctx;
+      const { loco } = window.__ctx;
       await loco.goTo(st, { fade: false });
       loco.look(yaw, pitch);
-      if (name === 'set-overview') {            // a crane shot of the set from behind-left of the tower
-        const rig = engine.camera.parent; rig.position.set(-38, 14, 30); rig.rotation.set(0, -0.75, 0); loco.look(0, -0.22);
-      }
     }, [st, yaw, pitch]);
     await page.waitForTimeout(1200);
     await page.screenshot({ path: `.superpowers/look/${name}.png` });

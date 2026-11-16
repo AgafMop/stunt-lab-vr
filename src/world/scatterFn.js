@@ -26,7 +26,7 @@ const KINDS = {
   rock:       [650, 14, 650, 16, 0.35, 1.5],
   boulder:    [140, 20, 900, 30, 2.2, 6.0],
   slab:       [110, 40, 420, 28, 3.0, 8.0],          // flat layered rock shelves, like the film's road side
-  shrub:      [1000, 10, 500, 12, 0.6, 1.5],
+  shrub:      [900, 10, 500, 12, 0.6, 1.5],
   grass:      [1300, 8, 350, 9, 0.5, 1.2],
 };
 

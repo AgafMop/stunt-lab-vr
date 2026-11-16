@@ -125,12 +125,14 @@ def film_light(x, z, aim_x, aim_z, height=3.4):
     return o, lens
 
 
-film_light(-12, -31, -10, -14)
-film_light(28, -32, 30, -14)
-film_light(64, -31, 64, -14)
+# low sun (≈ 11°): a shadow is ≈ 5× its object's height and falls toward +x/+z — keep every shadow off the strip
+# (z ≥ -18): lights (≈ 3.7 m) stand at z ≤ -44, the crane (≈ 5 m) at z ≤ -52, the 1.6 m camera at z ≤ -30
+film_light(-12, -44, -10, -14)
+film_light(28, -45, 30, -14)
+film_light(64, -44, 64, -14)
 
 # ---------------- camera crane near the strip end (far side) ----------------
-cx, cz = 84.0, -30.0
+cx, cz = 84.0, -54.0
 blk('dark', (2.0, 0.5, 1.2), (cx, 0.55, cz), bevel=0.04)
 for sx in (-0.85, 0.85):
     for sz in (-0.5, 0.5):
@@ -143,7 +145,7 @@ blk('dark', (0.45, 0.35, 0.7), (arm_b[0], arm_b[1] - 0.35, arm_b[2]), bevel=0.03
 tube('dark', 0.12, 0.35, (arm_b[0] - 0.1, arm_b[1] - 0.35, arm_b[2] + 0.45), verts=14, axis='Z3')
 
 # camera on a tripod aimed at the stop line
-tx, tz = 96.0, -27.0
+tx, tz = 96.0, -31.0
 for k in range(3):
     a = k * 2 * math.pi / 3 + 0.3
     beam('metal', (tx + math.cos(a) * 0.6, 0, tz + math.sin(a) * 0.6), (tx, 1.35, tz), 0.035)

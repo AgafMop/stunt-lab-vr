@@ -69,11 +69,11 @@ export async function loadStuntSet(engine) {
     if (lite) throw new Error('light world');
     const terrain = await loadTerrain(engine);
     root.add(terrain);
-    createSky(engine);
-    if (!lite) { root.add(createScatter(engine)); root.add(catcher); createDust(engine); }
+    createSky(engine, root);
+    if (!lite) { root.add(createScatter(engine)); root.add(catcher); createDust(engine, root); }
   } catch (e) {
     if (!lite) console.warn('terrain unavailable, flat ground', e);
-    createSky(engine);
+    createSky(engine, root);
     const ground = mesh(world, new THREE.PlaneGeometry(1400, 1400), mat(0xc98a52), [0, 0, 0], 'ground');
     ground.rotation.x = -Math.PI / 2;
   }

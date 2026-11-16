@@ -38,8 +38,8 @@ function rockGeo(seed, flat = 0.62) {
 function shrubGeo(seed) {
   const r = rand(seed), parts = [];
   const tint = [[0.40, 0.42, 0.27], [0.48, 0.44, 0.28], [0.36, 0.38, 0.30]][seed % 3];
-  for (let k = 0; k < 5; k++) {
-    const s = 0.28 + r() * 0.22, a = r() * Math.PI * 2, d = r() * 0.35;
+  for (let k = 0; k < 4; k++) {
+    const s = 0.30 + r() * 0.24, a = r() * Math.PI * 2, d = r() * 0.35;
     const g = new THREE.IcosahedronGeometry(s, 0); g.deleteAttribute('uv');
     g.scale(1, 0.8, 1); g.translate(Math.cos(a) * d, s * 0.7 + r() * 0.2, Math.sin(a) * d);
     const k2 = 0.85 + r() * 0.3;

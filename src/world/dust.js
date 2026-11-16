@@ -11,7 +11,7 @@ function roundDot() {
   return new THREE.CanvasTexture(c);
 }
 
-export function createDust(engine, { count = 700, box = 40 } = {}) {
+export function createDust(engine, parent = engine.scene, { count = 700, box = 40 } = {}) {
   const pos = new Float32Array(count * 3), seed = new Float32Array(count);
   for (let i = 0; i < count; i++) { pos[i * 3] = (Math.random() - 0.5) * box; pos[i * 3 + 1] = Math.random() * 14; pos[i * 3 + 2] = (Math.random() - 0.5) * box; seed[i] = Math.random(); }
   const geo = new THREE.BufferGeometry();
@@ -51,6 +51,6 @@ export function createDust(engine, { count = 700, box = 40 } = {}) {
     mat.uniforms.scale.value = engine.renderer.getPixelRatio() * (engine.isXR() ? 1.4 : 1);
   });
   pts.userData.dispose = off;
-  engine.scene.add(pts);
+  parent.add(pts);
   return pts;
 }

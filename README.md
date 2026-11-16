@@ -11,6 +11,8 @@ npm run serve                                    # http://localhost:8081
 npm test                                         # science + physics unit tests
 npx playwright test -g "boots"                   # browser tests: run in small groups
 npx playwright test -g "intro:"
+npx playwright test -g "world:"                  # the full world: budgets per view, no shadow on the strip
+npx playwright test -g "look:"                   # art-review screenshots → .superpowers/look/
 npx playwright test -g "drive sandbox"
 npx playwright test -g "race:"
 npx playwright test -g "strip:"
@@ -25,6 +27,15 @@ npx playwright test -g "full game"
   measure the student's real reaction time (false starts don't count), one lap against Bumper with a wet corner.
 - **Strip** (chapter `strip`): one brake test — pick a speed, optionally ride along, clapper "Action!", the car stops
   exactly where the science model says; read the radar and the ruler (drone zoom).
+
+## The world (art)
+- Desert canyon at golden hour, one sun for everything (`src/world/layout.js`). Terrain: `src/world/terrainFn.js`
+  (tested: flat under the game) → `node tools/world/gen-terrain.mjs` bakes sun shadow + sky AO → `assets/world/terrain.bin`.
+- Sky, haze, scatter, dust: `src/world/*.js`. Set (tower, lights, crane, camp): `blender/build_set.py`
+  (`node tools/world/export-layout.mjs` first; Blender 5.1 headless) → `node tools/optimize.mjs blender/cache/set_raw.glb assets/set.glb`.
+- Textures: Poly Haven, CC0 (`node tools/world/fetch-textures.mjs`).
+- `?world=lite` flat ground + sky (a fallback if a headset struggles; `?test` uses it by default — software GL is too
+  slow for the terrain shader) · `?world=full` forces the real world.
 
 ## Controls
 | | Headset | Desktop |

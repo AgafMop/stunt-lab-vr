@@ -57,6 +57,18 @@ function mesa(x, z, [mx, mz, r, h]) {
   return h * (0.72 * top + 0.28 * skirt);                                // strata come from the shader
 }
 
+// spires and thin buttes (Monument-Valley-like silhouettes on the horizon): x, z, radius, height
+const SPIRES = [
+  [-620, -1150, 45, 150], [-540, -1210, 28, 175], [-1250, -760, 60, 140], [-300, -1350, 38, 190], [-1700, -1050, 70, 160],
+  [1150, -1150, 50, 170], [1250, -1220, 30, 200], [700, -1350, 55, 150], [-1100, 1300, 60, 150], [1600, -300, 45, 180],
+  [-2300, -300, 80, 170], [2200, -900, 70, 190],
+];
+function spire(x, z, [sx, sz, r, h]) {
+  const d = Math.hypot(x - sx, z - sz), ang = Math.atan2(z - sz, x - sx);
+  const re = r * (1 + 0.25 * fbm(Math.cos(ang) * 1.5 + sx, Math.sin(ang) * 1.5 + sz, 2, 43));
+  return h * (0.85 * ss(re * 1.08, re * 0.92, d) + 0.15 * ss(re * 3.2, re * 1.1, d));
+}
+
 const GROUND_E = 60;                                                    // the far side is a high wall facing the tower (lit gold at sunset)
 
 /** Terrain height (m) at world (x, z). */
@@ -75,6 +87,7 @@ export function heightAt(x, z) {
     h -= 4 * (1 - ss(5, 16, dc));
   }
   for (const m of MESAS) { const mh = mesa(x, z, m); if (mh > 0.01) h = Math.max(h, mh + (x > fr ? GROUND_E : 0)); }
+  for (const sp of SPIRES) { const sh = spire(x, z, sp); if (sh > 0.01) h = Math.max(h, sh + (x > fr ? GROUND_E : 0)); }
   // a broken ridge closes the horizon so the edge of the world never shows
   const R = Math.hypot(x - GRID.cx, z - GRID.cz);
   if (R > 2000) h = Math.max(h, ss(2000, 2900, R) * (70 + 120 * (0.5 + 0.5 * fbm(x / 420, z / 420, 4, 61))));

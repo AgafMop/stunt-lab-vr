@@ -57,14 +57,15 @@ export function createSky(engine, noise = noiseTexture()) {
         c = mix(c, antiSun, (1.0 - side) * (1.0 - smoothstep(0.0, 0.45, up)) * 0.75);
         float cs = max(dot(d, sunDir), 0.0);
         c += sunCol * (pow(cs, 6.0) * 0.55 + pow(cs, 48.0) * 0.9 + pow(cs, 600.0) * 2.5);
-        c += sunCol * 4.0 * smoothstep(0.99955, 0.99975, cs);                   // the disc
+        c = mix(c, vec3(1.6, 1.25, 0.7), smoothstep(0.99800, 0.99860, cs));        // a big low sun disc, like the film's
         // sunset clouds: a flat layer, lit from below (gold toward the sun, pink-violet away)
         if (e > 0.01) {
           vec2 uv = d.xz / (e + 0.12) * 0.22;
           float n = texture2D(noise, uv).r * 0.65 + texture2D(noise, uv * 2.7 + 0.31).r * 0.35;
-          float cov = smoothstep(0.58, 0.76, n) * smoothstep(0.02, 0.12, e) * (1.0 - smoothstep(0.35, 0.8, e));
-          vec3 cl = mix(vec3(0.42, 0.17, 0.27), vec3(1.35, 0.50, 0.18), pow(side, 1.4)) + sunCol * pow(cs, 10.0) * 1.0;
-          c = mix(c, cl, cov * 0.85);
+          float cov = smoothstep(0.55, 0.70, n) * smoothstep(0.02, 0.12, e) * (1.0 - smoothstep(0.35, 0.8, e));
+          float rim = smoothstep(0.55, 0.85, n);                                  // thick cores dark, thin edges lit
+          vec3 cl = mix(vec3(0.20, 0.09, 0.17), vec3(1.30, 0.48, 0.16), pow(side, 1.3) * (1.0 - rim * 0.55)) + sunCol * pow(cs, 12.0) * 1.2;
+          c = mix(c, cl, cov * 0.92);
         }
         c = mix(c, haze, smoothstep(0.05, -0.02, e));                            // below the horizon: dust haze
         gl_FragColor = vec4(c, 1.0);

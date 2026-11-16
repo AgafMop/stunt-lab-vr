@@ -94,6 +94,14 @@ export async function loadStuntSet(engine) {
   const strip = mesh(world, new THREE.PlaneGeometry(stripLen, STRIP.width), asphalt,
     [(STRIP.startX + STRIP.endX) / 2, 0.01, STRIP.z], 'STRIP_asphalt');
   strip.receiveShadow = true;
+  { // road paint like the film: white edge lines, dashed yellow centre line (the ruler ticks stay on the near edge)
+    const lines = [], dash = [];
+    for (const side of [-1, 1]) { const g = new THREE.PlaneGeometry(stripLen, 0.12); g.rotateX(-Math.PI / 2); g.translate((STRIP.startX + STRIP.endX) / 2, 0.014, STRIP.z + side * (STRIP.width / 2 - 0.15)); lines.push(g); }
+    for (let x = STRIP.startX + 2; x < STRIP.endX - 12; x += 6) { const g = new THREE.PlaneGeometry(3, 0.12); g.rotateX(-Math.PI / 2); g.translate(x + 1.5, 0.014, STRIP.z - 0.9); dash.push(g); }
+    const pm = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
+    mesh(world, mergeGeometries(lines), pm(0xefe9dd), [0, 0, 0], 'stripEdges').receiveShadow = true;
+    mesh(world, mergeGeometries(dash), pm(0xe3b23c), [0, 0, 0], 'stripCentre').receiveShadow = true;
+  }
   strip.rotation.x = -Math.PI / 2;
   const ticks = [];
   for (let m = 0; m <= 120; m += 0.5) {

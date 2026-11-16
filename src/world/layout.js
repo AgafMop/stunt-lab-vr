@@ -13,9 +13,9 @@ export const SUN_DIR = n(-0.62, 0.19, -0.77);                                // 
 
 // Film palette (sampled from the opening-film frames, linear-ish sRGB 0..1)
 export const PALETTE = {                     // tuned for ACES tone mapping (saturated in → film colours out)
-  sun: [1.0, 0.60, 0.28],
-  skyZenith: [0.10, 0.09, 0.27],
-  skyHorizon: [1.05, 0.40, 0.12],
-  skyAntiSun: [0.46, 0.20, 0.32],
-  haze: [0.86, 0.38, 0.18],
+  sun: [1.0, 0.62, 0.26],
+  skyZenith: [0.06, 0.07, 0.20],
+  skyHorizon: [1.15, 0.44, 0.10],
+  skyAntiSun: [0.34, 0.15, 0.28],
+  haze: [0.80, 0.37, 0.18],
 };

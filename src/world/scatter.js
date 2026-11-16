@@ -99,13 +99,14 @@ export function createScatter(engine) {
   const kinds = {
     rock: [0, 1, 2].map(v => rockGeo(11 + v)),
     boulder: [0, 1, 2].map(v => rockGeo(31 + v, 0.75)),
+    slab: [0, 1, 2].map(v => rockGeo(41 + v, 0.22)),
     shrub: [0, 1, 2].map(v => shrubGeo(51 + v)),
     grass: [0, 1, 2].map(v => grassGeo(71 + v)),
   };
   const rockMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   const shrubMat = swayMaterial(new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), 0.06);
   const grassMat = swayMaterial(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), 0.12);
-  const mats = { rock: rockMat, boulder: rockMat, shrub: shrubMat, grass: grassMat };
+  const mats = { rock: rockMat, boulder: rockMat, slab: rockMat, shrub: shrubMat, grass: grassMat };
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
 
   // one InstancedMesh per kind (variants merged into one geometry would need a group; keep 3 per kind, all small)
@@ -134,7 +135,7 @@ export function createScatter(engine) {
   const sh = new THREE.InstancedMesh(sgeo, smat, casters.length);
   sh.name = 'scatter_shadows'; sh.renderOrder = 1;
   casters.forEach((it, k) => {
-    const h = it.kind === 'shrub' ? 1.0 : it.kind === 'boulder' ? 0.9 : 0.7;
+    const h = it.kind === 'shrub' ? 1.0 : it.kind === 'boulder' ? 0.9 : it.kind === 'slab' ? 0.3 : 0.7;
     q.setFromAxisAngle(Y, sdir);
     s.set(it.s * (0.6 + h * stretch), 1, it.s * (it.kind === 'shrub' ? 1.4 : 1.7));
     p.set(it.x, it.y + 0.03, it.z);

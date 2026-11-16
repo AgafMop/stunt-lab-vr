@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { GRID, gridToWorld } from './terrainFn.js';
 import { SUN_DIR, PALETTE } from './layout.js';
 
-export const HAZE = { density: 1 / 3200, canyon: 0.18 };
+export const HAZE = { density: 1 / 5200, canyon: 0.14 };
 
 /** Fog shared by the world's custom shaders (aerial perspective toward the sun). */
 export const HAZE_GLSL = /* glsl */`
@@ -18,7 +18,7 @@ export const HAZE_GLSL = /* glsl */`
     vec3 fc = mix(haze, sunCol * 1.25, toSun * 0.65);
     float f = 1.0 - exp(-d * hazeDensity);
     f += canyonHaze * smoothstep(-20.0, -120.0, wp.y) * smoothstep(60.0, 450.0, d);   // dusty air down in the canyon
-    return mix(c, fc, clamp(f, 0.0, 0.92));
+    return mix(c, fc, clamp(f, 0.0, 0.85));
   }`;
 
 export function hazeUniforms() {
@@ -68,8 +68,8 @@ export async function loadTerrain(engine, { base = 'assets/world/' } = {}) {
       sandD: { value: tex(L, base + 'tex/red_sand_diff.jpg', true) }, sandN: { value: tex(L, base + 'tex/red_sand_nor.jpg') },
       rockD: { value: tex(L, base + 'tex/cliff_side_diff.jpg', true) }, rockN: { value: tex(L, base + 'tex/cliff_side_nor.jpg') },
       gravD: { value: tex(L, base + 'tex/gravelly_sand_diff.jpg', true) },
-      skyCol: { value: new THREE.Color(0.42, 0.33, 0.50) }, bounceCol: { value: new THREE.Color(0.50, 0.24, 0.14) },
-      sunStrength: { value: 4.2 },
+      skyCol: { value: new THREE.Color(0.30, 0.22, 0.38) }, bounceCol: { value: new THREE.Color(0.46, 0.20, 0.11) },
+      sunStrength: { value: 5.2 },
     },
     vertexShader: /* glsl */`
       attribute vec2 light;

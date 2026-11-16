@@ -32,3 +32,5 @@ Spec: `docs/specs/2026-11-15-stunt-lab-design.md` §6 (chapters 2–8), §7 game
 13. Full-suite run, push (approved by "do everything"), report.
 
 ## Ledger
+Task 1: complete (race reaction meaning + assist; race: 6 e2e incl. new asserts)
+Task 2: complete (Bumper character; look: Bumper screenshot read)

@@ -1,190 +1,155 @@
-// Chapter "strip" — one brake test (spike version of spec §6 ch. 4):
-//   pick a speed → optional ride-along with Bumper → clapper "Action!" → the car accelerates, the FRONT WHEEL crosses the
-//   laser gate and it brakes fully → it stops exactly where model.js says → the student reads the radar and the ruler.
-// The run's numbers come only from sampleRun (the science model); the motion follows brakeProfile, so what the student
-// sees and what is recorded are the same thing.
-import * as THREE from 'three';
-import { board, row } from './kit.js';
-import { sampleRun, makeRng, kmhToMs, G } from '../game/model.js';
-import { brakeProfile } from '../game/carSim.js';
-import { STRIP } from '../lab/stuntScene.js';
+// Chapter 4 — the main experiment: speed vs braking distance (spec §6 ch. 4).
+//   1. three repeats at 40 km/h run by the student: clapper → Bumper drives (optional ride-along on the first) → he brakes
+//      exactly at the laser gate (so only the BRAKING distance is measured) → read the radar and the ruler (front wheel)
+//   2. the production notebook (results board) appears after the first good measurement
+//   3. the student picks 3–5 more speeds (spread out — Bumper complains if they are bunched)
+//   4. the crew runs them (fast), the student reads every second run; one run is the sprinkler accident
+//   5. the outlier: disqualify (with the reason) or keep — keeping it bends the graph
+// Every number comes from model.js (sampleRun); the motion follows stripPlan.js, so seen = recorded.
+import { board } from './kit.js';
+import { sampleRun, makeRng } from '../game/model.js';
+import { stripRun, choose, readDistance, action, num } from './stripKit.js';
+import { createResultsBoard } from '../ui/resultsBoard.js';
 
-const SPEEDS = [40, 60, 80];
-const RUNUP_ACCEL = 4;          // m/s² while accelerating to the target speed
-const CRUISE = 6;               // m driven at constant speed before the gate
-const FRONT = 1.35;             // front axle ahead of the car's origin (makeCar)
-const num = s => `⁦${s}⁩`;
+export const STUDENT_KMH = 40;
+const OPTIONS = [30, 50, 60, 70, 80, 90, 100, 110, 120];
+const AUTO_PICK = [30, 60, 80, 110];
 
 export async function run(ctx, scope) {
-  const { ui, game, engine, lab, params, loco } = ctx;
+  const { ui, game, lab, params, loco } = ctx;
   await loco.goTo('tower');
-  const speedK = ctx.auto ? ctx.animSpeed : 1;
-  const stripRun = ctx.stripRun = { frontX: null, read: null, rigTravel: 0, maxTilt: 0 };
+  const stripRunStats = ctx.stripRun = { frontX: null, read: null, rigTravel: 0, maxTilt: 0 };
+  const rng = makeRng(game.s.seed * 31 + 8);
+  const results = createResultsBoard(ctx); scope.add(() => results.dispose());
+  results.mesh.visible = Object.keys(game.s.trials).length > 0;
+  ctx.results = results;
 
-  // ---- 1. speed ----
-  const g = board(ctx, scope, 'A_board');
-  ctx.task?.set('strip_pick');
-  scope.say('strip_pick');
-  const target = await choose(ctx, scope, g, SPEEDS.map(v => [v, `${num(v)} קמ״ש`]), 60);
-
-  // ---- 2. ride along? ----
-  const ride = params.get('ride');
-  let rideAlong = ride === 'on';
-  if (!ride) {
-    ctx.task?.set('strip_ride');
-    scope.say('strip_ride');
-    rideAlong = await choose(ctx, scope, g, [[true, 'כן, אני נוסע/ת'], [false, 'אני נשאר/ת במגדל']], false);
-  }
-  game.s.flags.rodeAlong = rideAlong;
-  g.visible = false;
-
-  // ---- 3. Action! ----
-  const clap = scope.add(clapper());
-  lab.anchors.A_clapper.add(clap);
-  ctx.task?.set('strip_action');
-  await scope.say('strip_action');
-  await scope.waitSelect(clap);
-  clap.visible = false;
-  ctx.task?.set('strip_watch');
-
-  const { kmh, distance } = sampleRun(target, 'dry', makeRng(game.s.seed * 31 + 8));
-  // the run's own friction (μ ± the noise) so the car stops exactly at the recorded distance
-  const v = kmhToMs(kmh), prof = brakeProfile(v, v * v / (2 * G * distance));
-  const runup = v * v / (2 * RUNUP_ACCEL);
-  const gateX = STRIP.gateX, startFront = gateX - runup - CRUISE;
-  const car = lab.makeCar(0xf07a1a);
-  car.rotation.y = Math.PI / 2;                                    // heading +x along the strip
-  const setFront = x => { car.position.set(x - FRONT, 0, STRIP.z); };
-  setFront(startFront);
-  lab.world.add(car); scope.add(car);
-  ctx.track?.(car, 'stripCar');
-
-  const seatP = car.getObjectByName('seatP'), eye = new THREE.Vector3();
-  if (rideAlong) {
-    await engine.fade(1, 200);
-    loco.lock(true); loco.setPitch(-0.08);
-    loco.follow(() => ({ pos: seatP.getWorldPosition(eye), yaw: car.rotation.y + Math.PI }));
-    // an abort (teacher skip / game over) mid-ride must never leave the student riding a removed car
-    scope.add(() => { if (loco.following) { loco.follow(null); loco.goTo('tower', { fade: false }); } loco.lock(false); });
-    await engine.fade(0, 250);
-  }
-  const rigStart = engine.rig.position.clone();
-
-  // the run: accelerate → cruise → gate → full brake (exact profile) → stop
-  const tAcc = v / RUNUP_ACCEL, tCruise = CRUISE / v;
-  await scope.guard(new Promise(res => {
-    let t = 0;
-    const off = engine.onFrame(dt => {
-      t += dt * speedK;
-      let front;
-      if (t < tAcc) front = startFront + 0.5 * RUNUP_ACCEL * t * t;
-      else if (t < tAcc + tCruise) front = startFront + runup + v * (t - tAcc);
-      else front = gateX + prof.at(t - tAcc - tCruise).x;
-      setFront(front);
-      loco.applyFollow();
-      if (rideAlong) {
-        stripRun.rigTravel = Math.max(stripRun.rigTravel, engine.rig.position.distanceTo(rigStart));
-        stripRun.maxTilt = Math.max(stripRun.maxTilt, Math.abs(engine.rig.rotation.x), Math.abs(engine.rig.rotation.z));
-      }
-      if (t >= tAcc + tCruise + prof.stopTime) { off(); res(); }
-    });
-    scope.add(off);
-  }));
-  ctx.audio.sfx('ok');
-  stripRun.frontX = car.getObjectByName('frontWheel').getWorldPosition(eye).x - lab.strip.rulerZero.x;
-  await scope.wait(900);
-
-  if (rideAlong) {
-    await engine.fade(1, 200);
-    loco.follow(null);
-    await loco.goTo('tower', { fade: false });
-    await engine.fade(0, 250);
-  }
-  loco.lock(false);
-
-  // ---- 4. read the radar and the ruler ----
+  // the radar reads the gate speed after each run
+  let radarKmh = null;
   const radar = scope.add(ui.panel({ w: 0.34, h: 0.16, name: 'radar', viewDist: 1.2, draw(c, W, H) {
     ui.rr(c, 4, 4, W - 8, H - 8, 24); c.fillStyle = '#10141c'; c.fill();
     c.fillStyle = '#7CFF9B';
-    ui.fitText(c, `${num(kmh)} קמ״ש`, { x: 16, y: 10, w: W - 32, h: H - 20, maxPx: H * 0.6, minPx: ui.minPx(900, 1.2), font: ui.FONT });
+    ui.fitText(c, radarKmh == null ? '— קמ״ש' : `${num(radarKmh)} קמ״ש`, { x: 16, y: 10, w: W - 32, h: H - 20, maxPx: H * 0.6, minPx: ui.minPx(900, 1.2), font: ui.FONT });
   } }));
   lab.anchors.A_radar.add(radar.mesh);
+  const showRadar = k => { radarKmh = k; radar.redraw(); };
 
-  const g2 = board(ctx, scope, 'A_board');
-  const zoom = scope.add(ui.panel({ w: 0.9, h: 0.3, name: 'droneZoom', viewDist: 1.2, draw: (c, W, H) => drawZoom(ui, c, W, H, distance) }));
-  zoom.mesh.position.set(0, 0.16, 0); g2.add(zoom.mesh);
-  ctx.task?.set('strip_read');
-  scope.say('strip_read');
-  const base = Math.round(distance * 2) / 2;
-  const options = [1, 0.5, 0, -0.5, -1].map(k => base + k).filter(x => x >= 0);   // row() is RTL: list high→low so the chips grow left→right like the ruler
-  for (;;) {
-    const read = await choose(ctx, scope, g2, options.map(x => [x, `${num(x.toFixed(1))} מ׳`]), distance, { y: -0.12, w: 0.16, h: 0.1 });
-    if (read === distance) { stripRun.read = read; break; }
-    ctx.audio.sfx('no');
-    await scope.say('strip_wrong');
+  await scope.say('main_intro');
+  await scope.say('main_gate');
+
+  // ---- 1. three repeats at 40, by the student ----
+  const have = (game.s.trials[STUDENT_KMH] || []).length;
+  for (let k = have; k < 3; k++) {
+    let rideAlong = params.get('ride') === 'on';
+    if (k === 0 && !params.get('ride')) {
+      const g = board(ctx, scope, 'A_board');
+      ctx.task?.set('strip_ride');
+      scope.say('strip_ride');
+      rideAlong = await choose(ctx, scope, g, [[true, 'כן, אני נוסע/ת'], [false, 'אני נשאר/ת במגדל']], false);
+      g.visible = false;
+    }
+    if (k === 0) game.s.flags.rodeAlong = rideAlong;
+    await action(ctx, scope);
+    ctx.task?.set('strip_watch');
+    const r = sampleRun(STUDENT_KMH, 'dry', rng);
+    const res = await stripRun(ctx, scope, { kmh: r.kmh, brake: r.distance, rideAlong: rideAlong && k === 0 });
+    if (k === 0) stripRunStats.frontX = res.car.getObjectByName('frontWheel').getWorldPosition(res.car.position.clone()).x - lab.strip.rulerZero.x;
+    showRadar(r.kmh);
+    await readDistance(ctx, scope, r.distance, { say: k === 0 });
+    if (k === 0) stripRunStats.read = r.distance;
+    lab.world.remove(res.car);
+    game.addTrial(STUDENT_KMH, { value: r.distance, kmh: r.kmh, by: 'student' });
+    ctx.audio.sfx('ok');
+    if (k === 0) { results.mesh.visible = true; scope.add(ctx.attention?.(results.mesh) ?? (() => {})); await scope.say('main_notebook'); }
+    if (k === 1) await scope.say('main_repeat');
   }
-  game.addTrial(kmh, { value: distance, kmh, target, by: 'student' });
+
+  // ---- 2. the student picks the other speeds ----
+  let speeds = Object.keys(game.s.trials).map(Number).filter(k => k !== STUDENT_KMH);
+  if (!speeds.length) speeds = await pickSpeeds(ctx, scope);
+  game.s.plan = [STUDENT_KMH, ...speeds].sort((a, b) => a - b);
+
+  // ---- 3. the crew runs them; the student reads every second run; one run is the sprinkler accident ----
+  ctx.task?.set('main_crew');
+  await scope.say('main_crew');
+  const sprinklerAt = { kmh: speeds[Math.min(1, speeds.length - 1)], index: 1 };
+  let n = 0;
+  for (const v of speeds) {
+    for (let i = (game.s.trials[v] || []).length; i < 3; i++) {
+      const accident = v === sprinklerAt.kmh && i === sprinklerAt.index && !game.s.flags.sprinkler;
+      const r = sampleRun(v, 'dry', rng, { sprinkler: accident });
+      if (accident) { game.s.flags.sprinkler = true; ctx.task?.set('strip_watch'); }
+      const res = await stripRun(ctx, scope, { kmh: r.kmh, brake: r.distance, surface: accident ? 'sprinkler' : 'dry', speed: accident ? 1 : 4 });
+      showRadar(r.kmh);
+      if (accident) await scope.say('main_sprinkler');
+      if (n++ % 2 === 0 || accident) await readDistance(ctx, scope, r.distance, { say: false });
+      lab.world.remove(res.car);
+      game.addTrial(v, { value: r.distance, kmh: r.kmh, by: 'crew', ...(accident ? { sprinkler: true } : {}) }, { free: true });
+      ctx.task?.set('main_crew');
+    }
+  }
+
+  // ---- 4. the outlier: disqualify with the reason, or keep it (and see the graph bend) ----
+  const list = game.s.trials[sprinklerAt.kmh] || [];
+  const bad = list.findIndex(t => t.sprinkler);
+  if (bad >= 0 && list[bad].valid) {
+    results.highlight(sprinklerAt.kmh);
+    ctx.task?.set('main_decide');
+    await scope.say('main_decide');
+    let first = true;
+    for (;;) {
+      const g = board(ctx, scope, 'A_board');
+      const pick = await choose(ctx, scope, g, [['disq', 'לפסול: הממטרה הרטיבה את הכביש'], ['keep', 'להשאיר את המדידה']], 'disq', { w: 0.42, h: 0.12 });
+      g.visible = false;
+      if (pick === 'disq') {
+        game.disqualify(sprinklerAt.kmh, bad, 'ממטרה הרטיבה את הכביש');
+        game.markDecision(first);
+        if (first) game.award('שופט/ת הוגן/ת');
+        await scope.say('main_disq');
+        break;
+      }
+      first = false;
+      game.markDecision(false);
+      results.redraw();
+      await scope.say('main_keep');
+    }
+    results.highlight(null);
+  }
   ctx.task?.clear();
-  ctx.audio.sfx('ok');
-  await scope.say('strip_done');
+  await scope.say('main_done');
 }
 
-/** Picture-less choice cards on a board; resolves the chosen value. ?auto picks `autoValue`. */
-async function choose(ctx, scope, g, items, autoValue, { y = 0, w = 0.26, h = 0.14 } = {}) {
+/** Toggle 3–5 speed tokens, spread out; the "done" button wakes when the choice is good. */
+async function pickSpeeds(ctx, scope) {
   const { ui } = ctx;
-  for (const ch of [...g.children]) if (ch.userData.choice) g.remove(ch);
-  let pick; const chosen = new Promise(res => { pick = res; });
-  const cards = items.map(([value, label]) => {
-    const c = scope.add(ui.card({ w, h, label, name: 'choice', viewDist: 1.2, onSelect: cc => { ctx.audio.sfx('click'); for (const x of cards) x.setState(x === cc ? 'sel' : 'off'); pick(value); } }));
-    c.mesh.userData.choice = true;
-    return c;
-  });
-  row(g, cards, { y });
-  const glowOffs = cards.map(c => ctx.attention?.(c.mesh) ?? (() => {}));
-  scope.add(() => glowOffs.forEach(f => f()));
-  const i = items.findIndex(([v]) => v === autoValue);
-  if (ctx.auto) setTimeout(() => ctx.input.select(cards[Math.max(0, i)].mesh), 300);
-  const value = await scope.guard(chosen);
-  glowOffs.forEach(f => f());
-  await scope.wait(250);
-  for (const c of cards) g.remove(c.mesh);
-  return value;
-}
-
-/** The drone's view of the ruler around the stopped car: ticks every 0.5 m, numbers every metre, the front wheel. */
-function drawZoom(ui, c, W, H, d) {
-  ui.rr(c, 4, 4, W - 8, H - 8, 24); c.fillStyle = '#3a3a40'; c.fill();
-  const from = Math.floor(d) - 3, to = from + 7, X = m => 80 + (m - from) / (to - from) * (W - 160);
-  c.strokeStyle = '#ffffff'; c.fillStyle = '#ffffff';
-  const fs = ui.minPx(900, 1.2) + 4;
-  c.font = `700 ${fs}px Heebo`; c.textAlign = 'center'; c.textBaseline = 'top';
-  for (let m = from; m <= to + 1e-9; m += 0.5) {
-    const major = Math.abs(m - Math.round(m)) < 1e-9;
-    c.lineWidth = major ? 6 : 3;
-    c.beginPath(); c.moveTo(X(m), H * 0.12); c.lineTo(X(m), H * (major ? 0.5 : 0.35)); c.stroke();
-    if (major) c.fillText(`${m}`, X(m), H * 0.56);
+  const g = board(ctx, scope, 'A_board');
+  ctx.task?.set('main_pick');
+  scope.say('main_pick');
+  const chosen = new Set();
+  let done = null;
+  const cards = OPTIONS.map(v => scope.add(ui.card({ w: 0.15, h: 0.1, label: `${num(v)}`, name: 'speed', viewDist: 1.2, onSelect: cc => {
+    ctx.audio.sfx('click');
+    if (chosen.has(v)) { chosen.delete(v); cc.setState('idle'); } else if (chosen.size < 5) { chosen.add(v); cc.setState('sel'); }
+    done?.setEnabled(chosen.size >= 3);
+  } })));
+  cards.forEach((c, i) => { const r = i < 5 ? 0 : 1, col = i < 5 ? i : i - 5; c.mesh.position.set(0.34 - col * 0.17, 0.08 - r * 0.12, 0.01); g.add(c.mesh); });
+  const caption = scope.add(ui.panel({ w: 0.86, h: 0.07, name: 'speedCaption', viewDist: 1.2, draw(c, W, H) {
+    c.fillStyle = '#EEF2F8'; ui.fitText(c, 'בחרו עוד 3–5 מהירויות (קמ״ש)', { x: 10, y: 4, w: W - 20, h: H - 8, maxPx: H * 0.6, minPx: ui.minPx(900, 1.2), font: ui.FONT });
+  } }));
+  caption.mesh.position.set(0, 0.18, 0.01); g.add(caption.mesh);
+  let pressed = null;
+  done = scope.add(ui.button3d('זהו, לנסיעות!', () => pressed?.(), { w: 0.3, h: 0.08, viewDist: 1.2 }));
+  done.mesh.position.set(0, -0.17, 0.01); g.add(done.mesh); done.setEnabled(false);
+  for (;;) {
+    const wait = new Promise(res => { pressed = res; });
+    if (ctx.auto) { for (const v of AUTO_PICK) chosen.add(v); done.setEnabled(true); setTimeout(() => pressed?.(), 200); }
+    const glow = ctx.attention?.(done.mesh) ?? (() => {});
+    await scope.guard(wait);
+    glow();
+    const s = [...chosen].sort((a, b) => a - b);
+    if (s.length >= 3 && s[s.length - 1] - s[0] >= 50) break;
+    await scope.say('main_crowded');
   }
-  // the car (from the left) and its front wheel exactly at d
-  c.fillStyle = '#f07a1a'; c.fillRect(X(d - 3.45), H * 0.14, X(d + 0.75) - X(d - 3.45), H * 0.2);   // body: rear 3.45 m behind, nose 0.75 m ahead of the front axle
-  c.fillStyle = '#111'; c.beginPath(); c.arc(X(d), H * 0.33, H * 0.07, 0, 7); c.fill();
-  c.strokeStyle = '#7CFF9B'; c.lineWidth = 3; c.setLineDash([8, 6]);
-  c.beginPath(); c.moveTo(X(d), H * 0.1); c.lineTo(X(d), H * 0.52); c.stroke(); c.setLineDash([]);
-}
-
-/** A clapperboard prop (click = "Action!"). */
-function clapper() {
-  // a real film clapper: black slate with chalk lines, black-and-white striped sticks (no text — only pictures)
-  const tex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
-  const stripes = tex(256, 40, (g, w, h) => { g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, w, h); g.fillStyle = '#141414'; for (let x = -40; x < w; x += 52) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 26, h); g.lineTo(x + 52, 0); g.lineTo(x + 26, 0); g.fill(); } });
-  const slate = tex(256, 190, (g, w, h) => { g.fillStyle = '#1b1b1d'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(240,240,235,0.85)'; g.lineWidth = 4; for (const y of [60, 110, 160]) { g.beginPath(); g.moveTo(14, y); g.lineTo(w - 14, y); g.stroke(); } for (const x of [w / 3, 2 * w / 3]) { g.beginPath(); g.moveTo(x, 60); g.lineTo(x, 110); g.stroke(); } });
-  const g = new THREE.Group(); g.name = 'clapper';
-  const dark = new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.6 });
-  const board = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.02), [dark, dark, dark, dark, new THREE.MeshStandardMaterial({ map: slate, roughness: 0.8 }), dark]);
-  board.position.y = 0.09; g.add(board);
-  const stickMat = [dark, dark, new THREE.MeshStandardMaterial({ map: stripes }), dark, new THREE.MeshStandardMaterial({ map: stripes }), dark];
-  const base = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.022), stickMat); base.position.y = 0.185; g.add(base);
-  const stick = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.022), stickMat);
-  stick.geometry.translate(0.11, 0, 0); stick.position.set(-0.11, 0.205, 0); stick.rotation.z = 0.32; g.add(stick);   // hinged at the left, open
-  g.rotation.x = -0.3;
-  return g;
+  g.visible = false;
+  return [...chosen].sort((a, b) => a - b);
 }

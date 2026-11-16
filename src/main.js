@@ -25,7 +25,7 @@ import { createBumper } from './world/bumper.js';
 import { DECK_Y } from './world/layout.js';
 
 const CH = { intro: chIntro, race: chRace, strip: chStrip, end: chEnd };
-const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', strip: 'נסיעת מבחן', end: 'סיכום' };
+const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', strip: 'הניסוי המרכזי', end: 'סיכום' };
 
 const params = new URLSearchParams(location.search);
 const TEST = params.has('test');

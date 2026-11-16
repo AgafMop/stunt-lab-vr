@@ -1,4 +1,5 @@
-// Strip chapter: one brake run decided by the science model; the car stops exactly where the model says.
+// Chapter 4 (id 'strip'): the main experiment — 3 student runs at 40, picked speeds run by the crew, the sprinkler
+// outlier disqualified; every car stops exactly where the model says.
 import { test, expect } from '@playwright/test';
 
 async function playStrip(page, extra = '') {
@@ -8,26 +9,33 @@ async function playStrip(page, extra = '') {
   await page.goto('/?test&only=strip&auto&fresh&seed=42' + extra);
   await expect(page.locator('#enter')).toBeEnabled({ timeout: 120_000 });
   await page.click('#enter');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 150_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 220_000 });
   const s = await page.evaluate(async () => {
     const { game, ui, motionAudit, stripRun } = window.__ctx;
     const { sampleRun, makeRng } = await import('/src/game/model.js');
     const { METER, TRIAL_COST } = await import('/src/game/config.js');
     return {
-      trials: game.s.trials, expected: sampleRun(60, 'dry', makeRng(game.s.seed * 31 + 8)),
-      meter: game.s.meter, meterWant: METER.start - TRIAL_COST, run: stripRun,
+      trials: game.s.trials, expected: sampleRun(40, 'dry', makeRng(game.s.seed * 31 + 8)),
+      meter: game.s.meter, meterWant: METER.start - 3 * TRIAL_COST, run: stripRun, plan: game.s.plan,
       flags: game.s.flags, text: ui.textAudit, motion: motionAudit,
     };
   });
   return { errors, s };
 }
 
-test('strip: brake run stops where the model says', async ({ page }) => {
-  test.setTimeout(180_000);
+test('strip: the main experiment — 3 repeats at 40, picked speeds, the sprinkler run disqualified', async ({ page }) => {
+  test.setTimeout(240_000);
   const { errors, s } = await playStrip(page);
-  const runs = s.trials[s.expected.kmh];
-  expect(runs).toHaveLength(1);
+  const runs = s.trials[40];
+  expect(runs).toHaveLength(3);
   expect(runs[0].value).toBe(s.expected.distance);
+  expect(s.plan).toEqual([30, 40, 60, 80, 110]);
+  for (const v of [30, 60, 80, 110]) expect(s.trials[v]).toHaveLength(3);
+  const bad = s.trials[60].filter(t => !t.valid);
+  expect(bad).toHaveLength(1);
+  expect(bad[0].sprinkler).toBe(true);
+  expect(bad[0].reason).toContain('ממטרה');
+  expect(s.flags.sprinkler).toBe(true);
   expect(Math.abs(s.run.frontX - s.expected.distance)).toBeLessThanOrEqual(0.05);
   expect(s.run.read).toBe(s.expected.distance);
   expect(s.meter).toBe(s.meterWant);

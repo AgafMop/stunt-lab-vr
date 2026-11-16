@@ -65,3 +65,23 @@ test('race: in the headset without controllers (hand tracking) the student is to
   expect(await page.evaluate(() => window.__ctx.game.s.reaction.simple.length)).toBe(0);   // no drill runs without controllers
   expect(errors).toEqual([]);
 });
+
+test('race: on desktop the view-choice cards open inside the camera view', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto('/?test&only=race&fresh');
+  await expect(page.locator('#enter')).toBeEnabled({ timeout: 120_000 });
+  await page.click('#enter');
+  await page.waitForFunction(() => !!window.__ctx?.engine.scene.getObjectByName('viewChoice'), null, { timeout: 30_000 });
+  await page.waitForTimeout(500);
+  const ndc = await page.evaluate(() => {
+    const { engine } = window.__ctx;
+    const g = engine.scene.getObjectByName('viewChoice');
+    engine.camera.updateMatrixWorld();
+    const p = g.getWorldPosition(g.position.clone()).project(engine.camera);
+    return { x: p.x, y: p.y, z: p.z };
+  });
+  expect(Math.abs(ndc.x)).toBeLessThan(0.6);
+  expect(Math.abs(ndc.y)).toBeLessThan(0.6);
+  expect(ndc.z).toBeLessThan(1);
+  await page.screenshot({ path: 'test-results/shots/race-choice.png' });
+});

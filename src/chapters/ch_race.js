@@ -31,7 +31,7 @@ export async function run(ctx, scope) {
   // ---- 1. view choice ----
   let view = ride === 'off' ? 'table' : ride === 'on' ? 'cockpit' : null;
   if (!view) {
-    const g = boardAtStation(ctx, scope, 'tower', { dist: 1.0, height: 1.3 });
+    const g = boardAtStation(ctx, scope, 'tower', { dist: 1.0, height: 1.3 }); g.name = 'viewChoice';
     let pick; const chosen = new Promise(res => { pick = res; });
     const cards = [['cockpit', 'בתוך הרכב', ICON_CAR], ['table', 'שלט רחוק מהמגדל', ICON_TABLE]].map(([id, label, icon]) => scope.add(ui.card({
       w: 0.32, h: 0.36, label, icon, name: 'view', viewDist: 1.0,

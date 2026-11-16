@@ -76,7 +76,16 @@ export function boardAtStation(ctx, scope, stationId, { dist = 1.0, height = 1.2
       }
     });
     scope.add(off);
-  } else place(s.yaw, s.pos, height);
+  } else {
+    // desktop: in front of the (possibly pitched) view, at the station's own floor height (the tower deck is 6 m up)
+    const head = engine.headPosition(new THREE.Vector3());
+    const dir = engine.camera.getWorldDirection(new THREE.Vector3());
+    if (side) dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.atan2(side, dist));
+    g.position.copy(head).addScaledVector(dir, dist);
+    g.position.y += Math.max(0, height - 1.25) * 0.5;
+    g.lookAt(head);
+    void s;
+  }
   ctx.engine.scene.add(g); scope.add(g);
   if (ctx.params?.has('tour')) ctx.tourPending = (ctx.tourPending || 0) + 1;   // ?tour: screenshot once it renders
   return g;

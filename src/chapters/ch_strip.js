@@ -60,7 +60,12 @@ export async function run(ctx, scope) {
     lab.world.remove(res.car);
     game.addTrial(STUDENT_KMH, { value: r.distance, kmh: r.kmh, by: 'student' });
     ctx.audio.sfx('ok');
-    if (k === 0) { results.mesh.visible = true; scope.add(ctx.attention?.(results.mesh) ?? (() => {})); await scope.say('main_notebook'); }
+    if (k === 0) {                                          // the notebook appears: glow only while it is introduced
+      results.mesh.visible = true;
+      const glow = ctx.attention?.(results.mesh) ?? (() => {});
+      await scope.say('main_notebook');
+      glow();
+    }
     if (k === 1) await scope.say('main_repeat');
   }
 

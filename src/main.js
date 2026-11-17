@@ -110,7 +110,7 @@ async function boot() {
   // the PC showcase tier (desktop): bloom, film grade, 4096 shadows. Never in ?test (unless ?quality=pc), never in XR.
   const q = params.get('quality');
   if (q === 'pc' || (!TEST && q !== 'quest')) {
-    ctx.pc = enablePcQuality(engine, ctx.lab);
+    ctx.pc = enablePcQuality(engine, ctx.lab, { skip: () => ctx.introPhase === 'video', showFps: params.has('fps') });
     const sun = ctx.lab.sun;
     const setShadow = n => { if (sun?.shadow) { sun.shadow.mapSize.set(n, n); sun.shadow.map?.dispose(); sun.shadow.map = null; } };
     engine.renderer.xr.addEventListener('sessionstart', () => setShadow(2048));     // the headset keeps the lean path
@@ -121,6 +121,7 @@ async function boot() {
   ctx.bumper = createBumper(engine, audio);
   ctx.bumper.position.set(1.5, DECK_Y, -0.6); ctx.bumper.rotation.y = Math.atan2(-1.5, -0.8);
   ctx.lab.tower.add(ctx.bumper);
+  ctx.bumper.traverse(o => { o.castShadow = false; });       // the cockpit lap stays inside the triangle budget
   { const cam = new THREE.Vector3(); ctx.bumper.userData.lookAt(() => engine.camera.getWorldPosition(cam)); }
   if (wantsFilm()) ctx.introVideo = createIntroVideo();   // preload while the set loads
   ctx.loco = createLocomotion(engine, input, { room: { x0: -1.7, x1: 1.7, z0: -1.7, z1: 1.7 }, blocks: [[-0.7, 0.7, -0.75, -0.15]] });

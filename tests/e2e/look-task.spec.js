@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('look: task card and glow (screenshots)', async ({ page }) => {
   test.setTimeout(240_000);
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto('/?test&world=full&fresh&only=race');
+  await page.goto('/?test&world=full&fresh&only=race' + (process.env.LOOK_Q ? '&quality=' + process.env.LOOK_Q : ''));
   await expect(page.locator('#enter')).toBeEnabled({ timeout: 180_000 });
   await page.click('#enter');
   await page.waitForFunction(() => !!window.__ctx.engine.scene.getObjectByName('viewChoice') && window.__ctx.engine.fadeLevel() < 0.05, null, { timeout: 120_000 });

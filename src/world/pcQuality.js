@@ -26,7 +26,7 @@ const GradeShader = {
     }`,
 };
 
-export function enablePcQuality(engine, lab) {
+export function enablePcQuality(engine, lab, opts = {}) {
   const { renderer, scene, camera } = engine;
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
   if (lab?.sun?.shadow) { lab.sun.shadow.mapSize.set(4096, 4096); lab.sun.shadow.map?.dispose(); lab.sun.shadow.map = null; }
@@ -34,13 +34,36 @@ export function enablePcQuality(engine, lab) {
   const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.32, 0.55, 0.92);
+  // threshold above 1: only the sun disc, lamps and glints bloom — never the white ruler ticks, signs or UI text
+  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.32, 0.55, 1.4);
   composer.addPass(bloom);
   composer.addPass(new ShaderPass(GradeShader));
   composer.addPass(new OutputPass());
   const resize = () => { const s = renderer.getDrawingBufferSize(new THREE.Vector2()); composer.setSize(s.x / renderer.getPixelRatio(), s.y / renderer.getPixelRatio()); };
   addEventListener('resize', resize); resize();
-  // the renderer's own tone mapping must not run twice: OutputPass applies it
-  engine.setDraw(dt => composer.render(dt));
-  return { composer, bloom, dispose() { engine.setDraw(null); removeEventListener('resize', resize); composer.dispose(); } };
+  // the renderer's own tone mapping must not run twice: OutputPass applies it. During the film the plain path draws
+  // the video untouched (the grade would shift its colours).
+  let on = true;
+  const draw = dt => { if (on && !opts.skip?.()) composer.render(dt); else renderer.render(scene, camera); };
+  engine.setDraw(draw);
+
+  // adapt to the machine (many school PCs have integrated graphics): measure, then step down
+  //   1) pixel ratio 1   2) no post-processing, 2048 shadows
+  let stage = 0, frames = 0, acc = 0, warm = 3;
+  const fpsEl = opts.showFps ? Object.assign(document.body.appendChild(document.createElement('div')), { id: 'fps' }) : null;
+  if (fpsEl) Object.assign(fpsEl.style, { position: 'fixed', left: '10px', top: '10px', zIndex: 9, font: '600 13px monospace', color: '#7CFF9B', background: 'rgba(0,0,0,.6)', padding: '3px 7px', borderRadius: '6px', pointerEvents: 'none' });
+  const offProbe = engine.onFrame(dt => {
+    if (renderer.xr.isPresenting) return;
+    if (fpsEl) fpsEl.textContent = `${Math.round(1 / Math.max(dt, 1e-3))} fps · stage ${stage}`;
+    if ((warm -= dt) > 0 || stage >= 2) return;
+    acc += dt; frames++;
+    if (frames < 90) return;
+    const avg = acc / frames; acc = 0; frames = 0; warm = 1.5;
+    if (avg <= 1 / 45) return;
+    stage++;
+    if (stage === 1) { renderer.setPixelRatio(1); resize(); }
+    if (stage === 2) { on = false; if (lab?.sun?.shadow) { lab.sun.shadow.mapSize.set(2048, 2048); lab.sun.shadow.map?.dispose(); lab.sun.shadow.map = null; } }
+    console.info(`pc quality: ${Math.round(1 / avg)} fps → step down to stage ${stage}`);
+  });
+  return { composer, bloom, get stage() { return stage; }, dispose() { offProbe(); engine.setDraw(null); removeEventListener('resize', resize); composer.dispose(); fpsEl?.remove(); } };
 }

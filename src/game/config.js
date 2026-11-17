@@ -8,7 +8,7 @@ export const RESERVE = 240;            // after a second game over in the same c
 export const GAMEOVER_SCORE = 100;
 export const REPEATS = 3;              // repeats per condition
 export const CHAPTERS = ['intro', 'race', 'belt', 'plan', 'strip', 'graph', 'surfaces', 'stunt', 'road', 'end'];          // run order; every id needs a module in main.js → CH
-export const SAVE_KEY = 'stuntlab.v1';    // change per project (two labs on one origin must not share saves)
+export const SAVE_KEY = 'stuntlab.v2';   // v2: the full experiment (v1 saves from the spike are dropped on purpose)    // change per project (two labs on one origin must not share saves)
 
 export const START_DRILLS = 3;         // valid start-light reactions recorded in the race
 export const LIGHTS = { count: 5, stepMs: 700, holdMinMs: 800, holdMaxMs: 2500 };

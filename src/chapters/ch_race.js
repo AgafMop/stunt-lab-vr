@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { boardAtStation, row } from './kit.js';
 import { createDriveSession } from '../core/driveSession.js';
 import { autopilot } from '../game/autopilot.js';
+import { assistInput } from '../game/assist.js';
 import { classifyStart, makeRng } from '../game/model.js';
 import { START_DRILLS, LIGHTS, GHOST_SPEED, WET_RUSH } from '../game/config.js';
 import { reactionDistance } from '../game/model.js';
@@ -160,10 +161,7 @@ export async function run(ctx, scope) {
   const assist = params.get('assist') !== 'off';
   game.s.flags.assist = assist;
   if (ctx.auto) drive.setDriver(car => autopilot(car, track, 15));
-  else if (assist) drive.setDriver((car, cur) => {
-    const ap = autopilot(car, track, 99);
-    return { throttle: cur.throttle, brake: cur.brake, steer: Math.abs(cur.steer) > 0.25 ? cur.steer : ap.steer };
-  });
+  else if (assist) drive.setDriver((car, cur) => assistInput(car, track, cur));   // + a governor on the dry corners
   drive.freeze(false);
   ctx.task?.set('race_lap');
   await scope.say('race_go');

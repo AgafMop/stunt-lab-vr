@@ -45,3 +45,4 @@ Task 10: complete (ch road + end summary; full game e2e passes)
 Task 11: partial — 73/115 voiced; credits exhausted (key #2); 42 subtitle-only; niqqud ready for 3 garbled
 Task 12: complete (PC tier; Quest budget re-check: cockpit 114 calls / 395k tris, strip 75 / 381k)
 Task 13: suite green (unit 53; boots, intro, race, drive, strip, chapter, clarity, full game, tour, world); push blocked by permissions — awaiting the user
+Final fixes (advisor): SAVE_KEY v2; PC tier: bloom threshold 1.4, no composer during the film, fps probe step-down (+?fps); assist governor (tests/assist.test.js RED without governor → GREEN); notebook glow only while introduced; tower Bumper no shadow; scatter trimmed → cockpit 388k

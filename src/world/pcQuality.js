@@ -9,6 +9,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
+// a sharp sun glint on wet asphalt or chrome can exceed half-float range (Inf); the bloom's blur turns one Inf
+// pixel into big black blocks (NaN). Clamp right after the scene render: nothing real is brighter than this.
+const ClampShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main() { vec4 c = texture2D(tDiffuse, vUv); gl_FragColor = vec4(min(max(c.rgb, vec3(0.0)), vec3(48.0)), c.a); }',
+};
+
 const GradeShader = {
   uniforms: { tDiffuse: { value: null }, vignette: { value: 0.32 }, warmth: { value: 0.06 }, contrast: { value: 1.06 } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
@@ -34,6 +42,7 @@ export function enablePcQuality(engine, lab, opts = {}) {
   const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new ShaderPass(ClampShader));
   // threshold above 1: only the sun disc, lamps and glints bloom — never the white ruler ticks, signs or UI text
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.32, 0.55, 1.4);
   composer.addPass(bloom);
@@ -55,7 +64,7 @@ export function enablePcQuality(engine, lab, opts = {}) {
   const offProbe = engine.onFrame(dt => {
     if (renderer.xr.isPresenting) return;
     if (fpsEl) fpsEl.textContent = `${Math.round(1 / Math.max(dt, 1e-3))} fps · stage ${stage}`;
-    if ((warm -= dt) > 0 || stage >= 2) return;
+    if (opts.hold || (warm -= dt) > 0 || stage >= 2) return;            // ?pcstay: never step down (art reviews)
     acc += dt; frames++;
     if (frames < 90) return;
     const avg = acc / frames; acc = 0; frames = 0; warm = 1.5;

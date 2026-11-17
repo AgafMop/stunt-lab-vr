@@ -14,11 +14,12 @@ async function boot(page, query) {
 }
 
 test('clarity: the whole game names each task in order', async ({ page }) => {
-  test.setTimeout(330_000);
+  test.setTimeout(620_000);                                         // the 1.9 km lap made the game longer
   const errors = await boot(page, '&auto&fresh&seed=42');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 320_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 600_000 });
   const log = await page.evaluate(() => window.__ctx.taskLog);
-  const order = ['race_choose', 'race_drill', 'race_reaction', 'race_lap', 'belt_choose', 'tyre_q', 'plan_iv', 'plan_sort', 'strip_ride',
+  const order = ['race_drill',                                       // desktop: no view choice (straight into the chase camera)
+    'race_reaction', 'race_lap', 'belt_choose', 'tyre_q', 'plan_iv', 'plan_sort', 'strip_ride',
     'strip_action', 'strip_read', 'main_pick', 'main_decide', 'graph_pair', 'graph_explain', 'surf_pick', 'surf_rank', 'stunt_react', 'stunt_lamp',
     'road_rain', 'road_auto', 'end'];
   let at = -1;
@@ -26,17 +27,14 @@ test('clarity: the whole game names each task in order', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('clarity: the view cards glow until one is chosen, and the task banner says what to do', async ({ page }) => {
+test('clarity: on desktop the race opens on the start drill, and the task banner says what to do and which keys', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await boot(page, '&only=race&fresh');
-  await page.waitForFunction(() => !!window.__ctx.engine.scene.getObjectByName('viewChoice'), null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__ctx.taskLog?.includes('race_drill'), null, { timeout: 60_000 });
   await expect(page.locator('#task')).toBeVisible();
-  await expect(page.locator('#task')).toContainText('איך');
-  const glows = () => page.evaluate(() => { let n = 0; window.__ctx.engine.scene.getObjectByName('viewChoice').traverse(o => { if (o.name === 'attention') n++; }); return n; });
-  expect(await glows()).toBe(2);
-  await page.evaluate(() => { const g = window.__ctx.engine.scene.getObjectByName('viewChoice'); window.__ctx.input.select(g.children.find(c => c.isMesh)); });
-  await page.waitForTimeout(300);
-  expect(await glows()).toBe(0);
+  await expect(page.locator('#task')).toContainText('זינוק');
+  await expect(page.locator('#task small')).toContainText('W');
+  expect(await page.evaluate(() => window.__ctx.taskLog.includes('race_choose'))).toBe(false);
   expect(errors).toEqual([]);
 });
 

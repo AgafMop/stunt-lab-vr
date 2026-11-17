@@ -34,22 +34,19 @@ test('drive sandbox: both views, toggle, no errors', async ({ page }) => {
   expect(s.calls).toBeLessThanOrEqual(150);
   await page.screenshot({ path: `${SHOTS}/cockpit.png` });
 
-  await page.keyboard.press('KeyV');
-  await page.waitForFunction(() => window.__ctx.drive.view.mode === 'table' && window.__ctx.engine.fadeLevel() === 0);
+  await page.keyboard.press('KeyV');                                  // desktop: V switches the driver's seat ↔ the chase camera
+  await page.waitForFunction(() => window.__ctx.drive.view.mode === 'chase' && window.__ctx.engine.fadeLevel() === 0);
   const t = await page.evaluate(() => {
-    const { engine, loco, drive } = window.__ctx;
-    const head = engine.headPosition(), st = loco.stations.tower.pos;
-    return { d: Math.hypot(head.x - st.x, head.z - st.z), controllers: drive.input.read().controllers, calls: engine.renderer.info.render.calls };
+    const { engine, drive } = window.__ctx;
+    const head = engine.headPosition(), car = drive.car3d.position;
+    return { d: Math.hypot(head.x - car.x, head.z - car.z), up: head.y - car.y, controllers: drive.input.read().controllers, calls: engine.renderer.info.render.calls, rx: engine.rig.rotation.x, rz: engine.rig.rotation.z };
   });
-  expect(t.d).toBeLessThan(0.3);
+  expect(t.d).toBeGreaterThan(5); expect(t.d).toBeLessThan(10);       // behind the car…
+  expect(t.up).toBeGreaterThan(2);                                     // …and above it
+  expect(Math.abs(t.rx) + Math.abs(t.rz)).toBeLessThan(1e-6);
   expect(t.controllers).toBe(false);
   expect(t.calls).toBeLessThanOrEqual(150);
-  await page.keyboard.down('KeyW');
-  await page.waitForTimeout(800);
-  await page.keyboard.up('KeyW');
-  const still = await page.evaluate(() => { const h = window.__ctx.engine.headPosition(), st = window.__ctx.loco.stations.tower.pos; return Math.hypot(h.x - st.x, h.z - st.z); });
-  expect(still).toBeLessThan(0.3);            // W drives the car, it doesn't walk the student around the deck
-  await page.screenshot({ path: `${SHOTS}/table.png` });
+  await page.screenshot({ path: `${SHOTS}/chase.png` });
   expect(errors).toEqual([]);
 });
 

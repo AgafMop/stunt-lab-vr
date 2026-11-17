@@ -1,6 +1,7 @@
 // Golden-hour sky dome: horizon-to-zenith gradient, warm side toward the sun and pink on the far side, sun disc +
 // glow, a thin layer of sunset clouds lit from below. One draw call, follows the camera, drawn behind everything.
 import * as THREE from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SUN_DIR, PALETTE } from './layout.js';
 
 const v3 = a => new THREE.Vector3(...a);
@@ -53,7 +54,7 @@ export function createSky(engine, parent = engine.scene, noise = noiseTexture())
         float up = clamp(e, 0.0, 1.0);
         vec3 c = mix(horizon, zenith, pow(up, 0.55));
         vec2 hz = normalize(d.xz + 1e-5), hs = normalize(sunDir.xz);
-        float side = dot(hz, hs) * 0.5 + 0.5;                                   // 1 toward the sun
+        float side = clamp(dot(hz, hs) * 0.5 + 0.5, 0.0, 1.0);                  // 1 toward the sun (clamped: pow() of a hair below 0 is NaN — it drew a dotted line opposite the sun)
         c = mix(c, antiSun, (1.0 - side) * (1.0 - smoothstep(0.0, 0.45, up)) * 0.75);
         float cs = max(dot(d, sunDir), 0.0);
         c += sunCol * (pow(cs, 6.0) * 0.55 + pow(cs, 48.0) * 0.9 + pow(cs, 600.0) * 2.5);
@@ -73,7 +74,9 @@ export function createSky(engine, parent = engine.scene, noise = noiseTexture())
         #include <colorspace_fragment>
       }`,
   });
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(100, 48, 24), mat);
+  // the sphere's seam (φ = 0 / 2π) has twin vertices a hair apart: welded, or the haze shows through as a dotted line
+  const sg = new THREE.SphereGeometry(100, 48, 24); sg.deleteAttribute('uv'); sg.deleteAttribute('normal');
+  const dome = new THREE.Mesh(mergeVertices(sg, 1e-3), mat);
   dome.name = 'sky'; dome.renderOrder = -1000; dome.frustumCulled = false;
   const p = new THREE.Vector3();
   dome.onBeforeRender = (r, s, cam) => { dome.position.copy(cam.getWorldPosition(p)); dome.updateMatrixWorld(); };

@@ -3,10 +3,11 @@
 // left thumbstick. Desktop: W/↑ gas, S/↓ brake, A/D/←/→ steer (eased). Missing controllers or axes read as zeros.
 import * as THREE from 'three';
 import { createWheelGrip, MAX_WHEEL } from '../game/wheel.js';
+import { keySteerStep } from '../game/keySteer.js';
 
-const DEAD = 0.12, GRAB_R = 0.3, KEY_RATE = 1 / 0.15;
+const DEAD = 0.12, GRAB_R = 0.3;
 
-export function createDriveInput(engine, input, { car3d }) {
+export function createDriveInput(engine, input, { car3d, speed = () => 0 }) {
   const wheelMesh = car3d.getObjectByName('wheel');
   const center = wheelMesh.position.clone();
   const normal = new THREE.Vector3(0, 0, -1).applyEuler(wheelMesh.rotation);   // toward the driver, car-local
@@ -47,8 +48,7 @@ export function createDriveInput(engine, input, { car3d }) {
       out.throttle = keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0;
       out.brake = keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0;
       const want = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
-      const d = want - keySteer, step = KEY_RATE * dt * (want === 0 ? 1.5 : 1);
-      keySteer += Math.abs(d) <= step ? d : Math.sign(d) * step;
+      keySteer = keySteerStep(keySteer, want, dt, speed());               // eased, gentler at speed (keySteer.js)
       out.steer = keySteer;
     }
     wheelMesh.rotation.set(baseRot.x, baseRot.y, baseRot.z + out.steer * MAX_WHEEL);   // clockwise as the driver sees it

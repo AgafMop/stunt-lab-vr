@@ -12,5 +12,5 @@ export const SAVE_KEY = 'stuntlab.v2';   // v2: the full experiment (v1 saves fr
 
 export const START_DRILLS = 3;         // valid start-light reactions recorded in the race
 export const LIGHTS = { count: 5, stepMs: 700, holdMinMs: 800, holdMaxMs: 2500 };
-export const GHOST_SPEED = 14;         // m/s: Bumper's rival car in the qualifying lap
+export const GHOST = { margin: 0.6, vMax: 21, accel: 3.2, decel: 4.5 };   // Bumper's racing line: a beatable pace (≈ 115 s lap)
 export const WET_RUSH = 18;            // m/s: entering the wet corner faster than this arms the wet-corner lesson

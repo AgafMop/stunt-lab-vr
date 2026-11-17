@@ -1,11 +1,18 @@
-// A drivable car on the race track: sim (fixed step) + input + view + off-track respawn.
+// A drivable car on the race track: sim (fixed step) + input + view + getting back on the road.
 // Used by the ?fx=drive sandbox and by the race chapter.
+// Off the road: sand drags the car down, the student can drive back. The game only puts the car back on the road
+// when it is far out (> 22 m), stuck in the sand (no progress for 3 s), or when the student asks (R / B button).
 import { createCar, stepCar, createStepper } from '../game/carSim.js';
-import { surfaceAt, respawn, OFFTRACK_RESPAWN_S } from '../game/track.js';
+import { respawn, OFFTRACK_RESPAWN_S } from '../game/track.js';
 import { createDriveInput } from './driveInput.js';
 import { createDriveView } from './driveView.js';
+import { rimX } from '../world/terrainFn.js';
+import { buildBarriers, collide } from '../game/barriers.js';
+import { TRACK_ORIGIN } from '../world/layout.js';
 
 const ZERO = { throttle: 0, brake: 0, steer: 0, controllers: false };
+const PARK = { throttle: 0, brake: 1, steer: 0, park: true };
+export const FAR_OFF = 22;
 
 /** timeScale/maxSub: ?auto self-play runs the sim faster (more fixed steps per frame), never coarser. */
 export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub = 30 } = {}) {
@@ -15,24 +22,40 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
   lab.world.add(car3d);
   const st = track.sample(0);
   const car = createCar({ x: st.x, z: st.z, heading: Math.atan2(st.tx, st.tz) });
-  const input = createDriveInput(engine, ctx.input, { car3d });
+  car.near = track.nearest(car.x, car.z); car.surface = 'dry';
+  const input = createDriveInput(engine, ctx.input, { car3d, speed: () => car.speed });
   const view = createDriveView(ctx, { car3d, forced });
-  let running = false, frozen = false, respawning = false, cur = ZERO, driver = null;
+  const walls = buildBarriers(track, TRACK_ORIGIN);
+  let lastBump = 0;
+  let running = false, frozen = false, respawning = false, cur = ZERO, driver = null, stuck = 0, resetAsked = false;
   const stepListeners = new Set();
 
   const stepper = createStepper(h => {
-    const surface = surfaceAt(track, car.x, car.z);
-    stepCar(car, frozen ? { throttle: 0, brake: 1, steer: 0 } : driver ? driver(car, cur) : cur, h, surface);
-    car.offTrack = surface === 'sand' ? car.offTrack + h : 0;
+    const near = car.near = track.nearest(car.x, car.z);
+    const [w0, w1] = track.def.wet;
+    const surface = near.dist > track.def.width / 2 ? 'sand' : near.s >= w0 && near.s <= w1 ? 'wet' : 'dry';
+    stepCar(car, frozen ? PARK : driver ? driver(car, cur, near) : cur, h, surface);
     car.surface = surface;
+    car.hit = collide(car, track, walls, near);                       // tyre walls, guardrail, gantry, grandstand are solid
+    if (car.hit > 2.5 && performance.now() - lastBump > 400) { lastBump = performance.now(); ctx.audio?.sfx?.('no'); }
+    car.offTrack = surface === 'sand' ? car.offTrack + h : 0;
+    stuck = surface === 'sand' && Math.abs(car.speed) < 1.2 ? stuck + h : 0;
     for (const fn of stepListeners) fn(car, h);
   }, 1 / 120, maxSub);
 
+  function needsRescue() {
+    if (resetAsked) return true;
+    if (car.surface !== 'sand') return false;
+    const wx = TRACK_ORIGIN.x + car.x, wz = TRACK_ORIGIN.z + car.z;
+    return car.near.dist > FAR_OFF || stuck > OFFTRACK_RESPAWN_S || wx > rimX(wz) - 6;
+  }
+
   async function doRespawn() {
-    respawning = true;
+    respawning = true; resetAsked = false;
     await engine.fade(1, 250);
     const r = respawn(track, car.x, car.z);
-    Object.assign(car, { x: r.x, z: r.z, heading: r.heading, speed: 0, offTrack: 0 });
+    Object.assign(car, { x: r.x, z: r.z, heading: r.heading, speed: 0, steer: 0, yawRate: 0, slip: 0, offTrack: 0 });
+    stuck = 0;
     view.update(car, 0);
     await engine.fade(0, 300);
     respawning = false;
@@ -43,30 +66,43 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
     cur = input.read();
     stepper(dt * timeScale);
     view.update(car, dt);
-    if (car.offTrack >= OFFTRACK_RESPAWN_S && !respawning) doRespawn();
+    if (!respawning && needsRescue()) doRespawn();
   });
 
-  const onKey = e => { if (e.code === 'KeyV' && running) view.toggle(); };
+  const onKey = e => {
+    if (!running) return;
+    if (e.code === 'KeyV' || e.code === 'KeyC') view.toggle();
+    if (e.code === 'KeyR' && !frozen) resetAsked = true;
+  };
   addEventListener('keydown', onKey);
-  let xLatch = false;
-  const offX = engine.onFrame(() => {                 // left X button toggles the view in XR
+  let xLatch = false, bLatch = false;
+  const offX = engine.onFrame(() => {                 // XR: left X toggles the view, right B puts the car back on the road
     if (!running) return;
     const left = ctx.input.pointers.find(p => p.handedness === 'left');
+    const right = ctx.input.pointers.find(p => p.handedness === 'right');
     const down = !!left?.source?.gamepad?.buttons?.[4]?.pressed;
     if (down && !xLatch) view.toggle();
     xLatch = down;
+    const b = !!right?.source?.gamepad?.buttons?.[5]?.pressed;
+    if (b && !bLatch && !frozen) resetAsked = true;
+    bLatch = b;
   });
 
   return {
     car, car3d, view, input, track,
     start() { running = true; view.update(car, 0); },
     stop() { running = false; },
-    /** Hold the car still (brakes on) — e.g. before the start lights. */
+    /** Hold the car still (brakes on, no creeping into reverse) — e.g. before the start lights. */
     freeze(v) { frozen = v; },
-    /** Replace the student's input by a function car → input (?auto self-play), or null. */
+    /** Replace the student's input by a function (car, studentInput, near) → input, or null. */
     setDriver(fn) { driver = fn; },
     onStep(fn) { stepListeners.add(fn); return () => stepListeners.delete(fn); },
-    placeAt(s) { const p = track.sample(s); Object.assign(car, { x: p.x, z: p.z, heading: Math.atan2(p.tx, p.tz), speed: 0, offTrack: 0 }); view.update(car, 0); },
+    placeAt(s) {
+      const p = track.sample(s);
+      Object.assign(car, { x: p.x, z: p.z, heading: Math.atan2(p.tx, p.tz), speed: 0, steer: 0, yawRate: 0, slip: 0, offTrack: 0 });
+      car.near = track.nearest(car.x, car.z);
+      view.update(car, 0);
+    },
     dispose() {
       running = false; offFrame(); offX(); removeEventListener('keydown', onKey);
       input.dispose(); view.dispose(); lab.world.remove(car3d);

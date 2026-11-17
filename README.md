@@ -21,7 +21,7 @@ npx playwright test -g "full game"
 
 ## The experiment (chapters, `src/game/config.js` → CHAPTERS)
 0. **intro** — the opening film. 1. **race** — view choice, 3 start-light drills (YOUR reaction time, explained: metres
-"blind" at 50 km/h), a lap with steering assist (`?assist=off`). 2. **belt** — the dummy with/without a belt (Newton 1,
+"blind" at 50 km/h), one lap of the 1.9 km circuit against Bumper (chase camera on desktop, V = driver's seat; blended steering help only in the headset, `?assist=off|light`). 2. **belt** — the dummy with/without a belt (Newton 1,
 ride next to Bumper), the tyre zoom with force arrows (Newton 2/3), "who stops the car? the road". 3. **plan** —
 hypothesis sentence, matching graph, variable sorting. 4. **strip** — the main experiment: 3 repeats at 40, picked
 speeds by the crew, the sprinkler outlier (disqualify). 5. **graph** — ×2 speed → ×4 braking from your data,
@@ -56,9 +56,9 @@ self-driving. Then the summary in your own numbers.
 | choose / click | trigger on a card | click |
 
 ## URL flags
-`?ride=off` tabletop view only (no riding, for the whole class) · `?ride=on` start in the car · `?fx=drive` free
+`?ride=off` tabletop moving-map view only (no riding, for the whole class) · `?ride=on` start in the car · `?ride=chase` chase camera · `?fx=drive` free
 driving sandbox · `?demo` teacher "next stage" (M / B / Y) · `?fresh` ignore the save · `?only=race|strip` one chapter ·
-`?seed=N` fixed data · `?test&auto` self-play (tests; skips the film unless `&film`).
+`?seed=N` fixed data · `?quality=pc&pcstay` PC tier without stepping down (art reviews: `npx playwright test -c playwright.gpu.config.js`) · `?test&auto` self-play (tests; skips the film unless `&film`).
 
 ## Science model
 `src/game/model.js`: stopping distance = v·t_r + v²/(2μg), g = 9.8, μ dry 0.75 / wet 0.45 / sand 0.35 / oil 0.15.

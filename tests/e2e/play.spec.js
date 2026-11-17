@@ -35,9 +35,9 @@ test('boots and teleports between stations', async ({ page }) => {
 
 // look at every board you add: screenshot it and READ the image (hidden, clipped or tiny text shows up here first)
 test('tour: screenshot every board', async ({ page }) => {
-  test.setTimeout(330_000);
+  test.setTimeout(620_000);                                         // the 1.9 km lap made the game longer
   const errors = await boot(page, '&auto&fresh&seed=7&tour');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 320_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 600_000 });
   const tour = await page.evaluate(() => window.__tour);
   const fs = await import('node:fs');
   fs.mkdirSync(SHOTS, { recursive: true });

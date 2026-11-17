@@ -23,7 +23,7 @@ export function fbm(x, z, oct = 4, seed = 1) {      // in [-1, 1]
 const ss = (a, b, t) => { const u = Math.min(1, Math.max(0, (t - a) / (b - a))); return u * u * (3 - 2 * u); };
 
 // ---- play area: exactly flat (strip, tower, the race track + 40 m of run-off) ----
-const PLAY = { x0: -185, z0: -350, z1: 42 };        // east side is cut by the rim
+const PLAY = { x0: -480, z0: -660, z1: 42 };        // the circuit + 50 m of run-off; the east side is cut by the rim
 function playDist(x, z) {                            // 0 inside, metres outside (west/north/south sides only)
   const dx = Math.max(PLAY.x0 - x, 0), dz = Math.max(PLAY.z0 - z, z - PLAY.z1, 0);
   return Math.hypot(dx, dz);
@@ -67,6 +67,7 @@ const SPIRES = [
   [-2300, -300, 80, 170], [2200, -900, 70, 190],
 ];
 function spire(x, z, [sx, sz, r, h]) {
+  r = Math.max(r, 70);                                                    // thinner than ~2 far grid cells = a 1-vertex needle (a dotted line in the sky)
   const d = Math.hypot(x - sx, z - sz), ang = Math.atan2(z - sz, x - sx);
   const re = r * (1 + 0.25 * fbm(Math.cos(ang) * 1.5 + sx, Math.sin(ang) * 1.5 + sz, 2, 43));
   return h * (0.85 * ss(re * 1.08, re * 0.92, d) + 0.15 * ss(re * 3.2, re * 1.1, d));
@@ -98,7 +99,7 @@ export function heightAt(x, z) {
 }
 
 // ---- warped grid: ≈ 2 m cells at the centre, ≈ 55 m at the edge, ±3.2 km ----
-export const GRID = { n: 300, cx: 200, cz: -120, S: 3200, a: 0.1, p: 3 };
+export const GRID = { n: 272, cx: 200, cz: -120, S: 3200, a: 0.1, p: 3 };   // 272: inside the Quest triangle budget with the 1.9 km circuit
 const warp = u => Math.sign(u) * GRID.S * (GRID.a * Math.abs(u) + (1 - GRID.a) * Math.abs(u) ** GRID.p);
 export function gridToWorld(i, j) {
   return { x: GRID.cx + warp((i / GRID.n) * 2 - 1), z: GRID.cz + warp((j / GRID.n) * 2 - 1) };

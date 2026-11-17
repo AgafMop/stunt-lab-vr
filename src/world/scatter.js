@@ -15,9 +15,9 @@ function paint(geo, fn) {
   return geo;
 }
 
-function rockGeo(seed, flat = 0.62) {
+function rockGeo(seed, flat = 0.62, detail = 1) {                      // detail 0 (20 faces) for the small rocks: Quest budget
   const r = rand(seed);
-  let g = mergeVertices(new THREE.IcosahedronGeometry(1, 1).deleteAttribute('normal').deleteAttribute('uv'));
+  let g = mergeVertices(new THREE.IcosahedronGeometry(1, detail).deleteAttribute('normal').deleteAttribute('uv'));
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const k = 0.72 + r() * 0.5;
@@ -38,8 +38,8 @@ function rockGeo(seed, flat = 0.62) {
 function shrubGeo(seed) {
   const r = rand(seed), parts = [];
   const tint = [[0.40, 0.42, 0.27], [0.48, 0.44, 0.28], [0.36, 0.38, 0.30]][seed % 3];
-  for (let k = 0; k < 4; k++) {
-    const s = 0.30 + r() * 0.24, a = r() * Math.PI * 2, d = r() * 0.35;
+  for (let k = 0; k < 3; k++) {                                          // 3 blobs (60 faces): the Quest triangle budget
+    const s = 0.33 + r() * 0.24, a = r() * Math.PI * 2, d = r() * 0.35;
     const g = new THREE.IcosahedronGeometry(s, 0); g.deleteAttribute('uv');
     g.scale(1, 0.8, 1); g.translate(Math.cos(a) * d, s * 0.7 + r() * 0.2, Math.sin(a) * d);
     const k2 = 0.85 + r() * 0.3;
@@ -97,7 +97,7 @@ export function createScatter(engine) {
   const group = new THREE.Group(); group.name = 'scatter';
   const items = scatter();
   const kinds = {
-    rock: [0, 1, 2].map(v => rockGeo(11 + v)),
+    rock: [0, 1, 2].map(v => rockGeo(11 + v, 0.62, 0)),
     boulder: [0, 1, 2].map(v => rockGeo(31 + v, 0.75)),
     slab: [0, 1, 2].map(v => rockGeo(41 + v, 0.22)),
     shrub: [0, 1, 2].map(v => shrubGeo(51 + v)),

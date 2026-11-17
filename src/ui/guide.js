@@ -46,8 +46,8 @@ export function createGuide(ctx) {
 
   // ---------- task ----------
   const dom = document.getElementById('task');
-  let text = '', hint = '';
-  const panel = ui.panel({ w: 0.62, h: 0.2, ppm: 900, viewDist: 1.1, name: 'task', draw(c, W, H) {
+  let text = '', hint = '', domHint = '';   // hint: the headset's controls (the 3D card only shows there), two lines
+  const panel = ui.panel({ w: 0.62, h: 0.26, ppm: 900, viewDist: 1.1, name: 'task', draw(c, W, H) {
     if (!text) return;
     ui.rr(c, 4, 4, W - 8, H - 8, 26); c.fillStyle = 'rgba(10,14,22,0.94)'; c.fill();
     c.lineWidth = 5; c.strokeStyle = '#FFB347'; c.stroke();
@@ -55,7 +55,12 @@ export function createGuide(ctx) {
     ui.fitText(c, 'המשימה עכשיו', { x: 24, y: 10, w: W - 48, h: H * 0.24, maxPx: H * 0.19, minPx: ui.minPx(900, 1.1), font: ui.FONT, align: 'right' });
     c.fillStyle = '#EEF2F8';
     ui.fitText(c, text, { x: 24, y: H * 0.3, w: W - 48, h: hint ? H * 0.4 : H * 0.62, maxPx: H * 0.2, minPx: ui.minPx(900, 1.1), font: ui.FONT, align: 'right' });
-    if (hint) { c.fillStyle = '#9FB0C8'; ui.fitText(c, hint, { x: 24, y: H * 0.72, w: W - 48, h: H * 0.22, maxPx: H * 0.13, minPx: ui.minPx(900, 1.1), font: ui.FONT, weight: 500, align: 'right' }); }
+    if (hint) {
+      c.fillStyle = '#9FB0C8';
+      const parts = hint.split(' · '), half = Math.ceil(parts.length / 2);
+      [parts.slice(0, half).join(' · '), parts.slice(half).join(' · ')].forEach((ln, i) =>
+        ui.fitText(c, ln, { x: 24, y: H * (0.7 + i * 0.145), w: W - 48, h: H * 0.14, maxPx: H * 0.12, minPx: ui.minPx(900, 1.1), font: ui.FONT, weight: 500, align: 'right' }));
+    }
   } });
   panel.mesh.name = 'taskCard'; panel.mesh.visible = false; panel.mesh.userData.ui = true;
   const towerHome = new THREE.Group(); towerHome.name = 'taskHome';
@@ -98,9 +103,9 @@ export function createGuide(ctx) {
     /** Set the current task by id (TASKS in script.js); null hides it. */
     set(id) {
       const t = id ? TASKS[id] : null;
-      text = t?.text || ''; hint = t?.drive ? driveHint(engine) : '';
+      text = t?.text || ''; hint = t?.drive ? driveHint(true) : ''; domHint = t?.drive ? driveHint(isXR()) : '';
       panel.redraw();
-      if (dom) { dom.replaceChildren(); if (text) { const b = document.createElement('b'); b.textContent = 'המשימה עכשיו'; const p = document.createElement('div'); p.textContent = text; dom.append(b, p); if (hint) { const s = document.createElement('small'); s.textContent = hint; dom.append(s); } } }
+      if (dom) { dom.replaceChildren(); if (text) { const b = document.createElement('b'); b.textContent = 'המשימה עכשיו'; const p = document.createElement('div'); p.textContent = text; dom.append(b, p); if (domHint) { const s = document.createElement('small'); s.textContent = domHint; dom.append(s); } } }
       if (id) ctx.taskLog?.push(id);
     },
     clear() { task.set(null); },
@@ -111,8 +116,8 @@ export function createGuide(ctx) {
 }
 
 /** The driving controls, as a hint line for the task card. */
-export function driveHint(engine) {
-  return engine.isXR()
-    ? 'הדק ימני: גז · הדק שמאלי: בלם · היגוי: אחיזה בהגה או מוט שמאלי · X: החלפת תצוגה'
-    : 'W: גז · S: בלם · A / D: היגוי · V: החלפת תצוגה';
+export function driveHint(xr) {
+  return xr
+    ? 'הדק ימני: גז · שמאלי: בלם · היגוי: הגה או מוט · X: תצוגה · B: לכביש'
+    : 'W: גז · S: בלם / רוורס · A / D: היגוי · V: מצלמה · R: לכביש';
 }

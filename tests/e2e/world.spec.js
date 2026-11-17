@@ -32,7 +32,7 @@ for (const [name, extra, ready] of CASES) test(`world: ${name} within budget, no
   await page.screenshot({ path: `.superpowers/look/world-${name}.png` });
   expect(b.calls, 'draw calls').toBeLessThanOrEqual(150);
   expect(b.tris, 'triangles').toBeLessThanOrEqual(400_000);
-  if (id === 'race') expect(await page.evaluate(() => ['tyres0', 'tyres1', 'startLine', 'trackPaint'].filter(n => !window.__ctx.lab.root.getObjectByName(n)))).toEqual([]);
+  if (id === 'race') expect(await page.evaluate(() => ['tyreWall', 'trackAsphalt', 'trackKerbs', 'trackPaint'].filter(n => !window.__ctx.lab.root.getObjectByName(n)))).toEqual([]);
   expect(errors).toEqual([]);
 });
 

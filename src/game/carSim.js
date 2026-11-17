@@ -1,8 +1,15 @@
 // Car physics (pure, Node-tested). Two uses:
 //  - brakeProfile: the scripted strip runs — constant deceleration μg from the gate, so the car stops exactly where
 //    model.js says (the numbers the student measures).
-//  - createCar/stepCar: the race — a kinematic bicycle model whose grip comes from the same μ table, so a full brake
-//    in the race feels like the data and a wet corner taken too fast understeers (the car goes straighter than asked).
+//  - createCar/stepCar: the race — an arcade-honest car that drives like the racing games students know:
+//      · the steering wheel turns at a finite rate and asks for a share of the AVAILABLE grip at this speed
+//        (full lock at 90 km/h is a firm limit turn, not a spin; at walking pace it is the real lock),
+//      · the body has yaw inertia (the turn builds up over ≈ 0.15 s and settles, no snapping),
+//      · grip is a friction circle from the same μ table as the science model: braking hard leaves less for turning,
+//        and a corner taken faster than √(μ g R) understeers — the car goes straighter than asked (the wet-corner
+//        lesson), while the body slides a little (slip angle, for tyre smoke and the look),
+//      · gas fades toward top speed (drag), sand drags hard (run-off slows you; you can drive back),
+//      · a full brake decelerates at exactly μ·g — the race brakes like the data.
 // Coordinates: three.js ground plane (x, z). heading 0 = facing +z; forward = (sin h, cos h).
 // steer > 0 = turn right, which (facing +z, seen from above with y up) decreases the heading.
 import { MU, G } from './model.js';
@@ -22,26 +29,75 @@ export function brakeProfile(v0, mu) {
   };
 }
 
-export const CAR = { maxSpeed: 25, accel: 6, coast: 0.8, wheelbase: 2.6, maxSteer: 0.5 };
+export const CAR = {
+  maxSpeed: 26,          // m/s (≈ 94 km/h) — top speed on the long straights
+  accel: 6.2,            // m/s² from standstill (fades with speed²)
+  coast: 0.6,            // m/s² rolling + engine braking with nothing pressed
+  sandDrag: 3.2,         // m/s² extra on sand (run-off)
+  reverse: 4,            // m/s top reverse speed (brake held at a standstill)
+  wheelbase: 2.7,
+  maxSteer: 0.55,        // rad, the wheels' full lock at walking pace
+  steerRate: 3.2,        // full-lock fractions per second the wheels can turn
+  gripAsk: 1.08,         // full lock asks this × the dry grip at speed (a little over: the limit is felt, not hidden)
+  yawLag: 0.13,          // s, the body's yaw response time
+  steerCurve: 1.6,       // response curve: small inputs (a key tap, a nudge of the stick) turn gently
+};
 
 export function createCar({ x = 0, z = 0, heading = 0 } = {}) {
-  return { x, z, heading, speed: 0, steer: 0, offTrack: 0 };
+  return { x, z, heading, speed: 0, steer: 0, yawRate: 0, slip: 0, sliding: 0, latG: 0, offTrack: 0 };
+}
+
+/** The curvature (1/m) the wheels ask for at full lock at this speed. */
+export function lockCurvature(speed) {
+  const geo = Math.tan(CAR.maxSteer) / CAR.wheelbase;
+  const v2 = speed * speed;
+  return v2 > 1e-6 ? Math.min(geo, (CAR.gripAsk * MU.dry * G) / v2) : geo;
 }
 
 /** One fixed step h (s). input: { throttle 0..1, brake 0..1, steer -1..1 }. Mutates and returns the car. */
-export function stepCar(car, { throttle = 0, brake = 0, steer = 0 }, h, surface) {
-  const mu = MU[surface] ?? MU.dry;
-  if (brake > 0 || throttle <= 0) {
-    const decel = Math.max(brake * mu * G, CAR.coast);
-    car.speed = Math.max(0, car.speed - decel * h);
-  } else {
-    car.speed = Math.min(CAR.maxSpeed, car.speed + throttle * CAR.accel * h);
-  }
-  car.steer = steer;
-  let k = Math.tan(steer * CAR.maxSteer) / CAR.wheelbase;           // asked curvature
-  const kMax = car.speed > 0 ? mu * G / (car.speed * car.speed) : Infinity;
-  if (Math.abs(k) > kMax) k = Math.sign(k) * kMax;                   // friction limit: understeer
-  car.heading -= car.speed * k * h;
+export function stepCar(car, { throttle = 0, brake = 0, steer = 0, park = false }, h, surface) {
+  const mu = MU[surface] ?? MU.dry, grip = mu * G;
+  // ---- the steering wheel: finite rate ----
+  const ds = steer - car.steer, maxD = CAR.steerRate * h;
+  car.steer += Math.abs(ds) <= maxD ? ds : Math.sign(ds) * maxD;
+
+  // ---- longitudinal ----
+  const v = car.speed, gas = throttle > 0, brk = brake > 0;
+  let aLong = 0;
+  if (v > 0.05) {
+    if (brk) aLong = -brake * grip;                                                   // exactly μ·g at full brake
+    else if (gas) aLong = throttle * Math.min(grip, CAR.accel * Math.max(0, 1 - (v / CAR.maxSpeed) ** 2));
+  } else if (v < -0.05) {
+    if (gas) aLong = throttle * grip;                                                 // gas while reversing = brake
+    else if (brk) aLong = v > -CAR.reverse ? -2.5 * brake : 0;
+  } else if (gas) aLong = throttle * Math.min(grip, CAR.accel);
+  else if (brk && !park) { car.still = (car.still || 0) + h; if (car.still > 0.5) aLong = -2.5 * brake; }   // hold the brake to reverse
+  if (!brk || gas) car.still = 0;
+  const drag = (CAR.coast * (gas || brk ? 0 : 1) + (surface === 'sand' ? CAR.sandDrag * Math.min(1, Math.abs(v) / 9) : 0)) * Math.sign(v);   // sand bites at speed
+  let nv = v + (aLong - drag) * h;
+  if (v > 0 && nv < 0 && !gas) nv = 0;                                                // braking/coasting stops, never reverses
+  if (v < 0 && nv > 0 && !gas) nv = 0;
+  if (Math.abs(nv) <= 0.05 && aLong === 0) nv = 0;
+  car.speed = Math.max(-CAR.reverse, Math.min(CAR.maxSpeed, nv));
+
+  // ---- lateral: friction circle (hard braking leaves less grip for turning) ----
+  const used = Math.min(1, Math.abs(aLong) / grip);
+  const latMax = grip * Math.sqrt(Math.max(0.15, 1 - 0.8 * used * used));
+  const sp = Math.abs(car.speed);
+  const kAsk = Math.sign(car.steer) * Math.abs(car.steer) ** CAR.steerCurve * lockCurvature(sp);   // > 0 = right; gentle near centre
+  let kGet = kAsk;
+  const kLim = sp > 0.1 ? latMax / (sp * sp) : Infinity;
+  const over = Math.abs(kAsk) > kLim ? Math.abs(kAsk) / kLim : 1;
+  if (over > 1) kGet = Math.sign(kAsk) * kLim;                                        // understeer: straighter than asked
+  const rDes = -car.speed * kGet;                                                     // yaw rate (rad/s), right = negative
+  car.yawRate += (rDes - car.yawRate) * Math.min(1, h / CAR.yawLag);
+  car.heading += car.yawRate * h;
+  car.latG = sp * Math.abs(car.yawRate) / G;
+  // the body's slip angle (visual): grows when the tyres are past the limit, eases back when they grip again
+  const slipWant = over > 1 ? Math.sign(kAsk) * Math.min(0.14, (over - 1) * 0.12 + 0.03) : 0;
+  car.slip += (slipWant - car.slip) * Math.min(1, h / 0.25);
+  car.sliding = over > 1.02 ? Math.min(1, (over - 1) * 2) : (used > 0.95 && sp > 3 ? 0.6 : 0);
+
   car.x += Math.sin(car.heading) * car.speed * h;
   car.z += Math.cos(car.heading) * car.speed * h;
   return car;

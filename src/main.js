@@ -27,6 +27,7 @@ import * as chStunt from './chapters/ch_stunt.js';
 import * as chRoad from './chapters/ch_road.js';
 import { createIntroVideo, primeIntroVideo } from './lab/introCinema.js';
 import { createGuide } from './ui/guide.js';
+import { createRaceHud } from './ui/raceHud.js';
 import { createBumper } from './world/bumper.js';
 import { enablePcQuality } from './world/pcQuality.js';
 import { DECK_Y } from './world/layout.js';
@@ -107,10 +108,11 @@ const $ = id => document.getElementById(id);
 async function boot() {
   ctx.lab = await loadStuntSet(engine);
   { const g = createGuide(ctx); ctx.task = g.task; ctx.attention = g.attention; ctx.taskLog = []; }
+  ctx.raceHud = createRaceHud(engine);
   // the PC showcase tier (desktop): bloom, film grade, 4096 shadows. Never in ?test (unless ?quality=pc), never in XR.
   const q = params.get('quality');
   if (q === 'pc' || (!TEST && q !== 'quest')) {
-    ctx.pc = enablePcQuality(engine, ctx.lab, { skip: () => ctx.introPhase === 'video', showFps: params.has('fps') });
+    ctx.pc = enablePcQuality(engine, ctx.lab, { skip: () => ctx.introPhase === 'video', showFps: params.has('fps'), hold: params.has('pcstay') });
     const sun = ctx.lab.sun;
     const setShadow = n => { if (sun?.shadow) { sun.shadow.mapSize.set(n, n); sun.shadow.map?.dispose(); sun.shadow.map = null; } };
     engine.renderer.xr.addEventListener('sessionstart', () => setShadow(2048));     // the headset keeps the lean path
@@ -168,11 +170,12 @@ async function start(vr) {
   runGame().catch(err => console.error(err));
 }
 
-/** ?fx=drive — drive the race car freely (no chapter). ?ride=off locks the tabletop view; otherwise start in the cockpit. */
+/** ?fx=drive — drive the race car freely (no chapter). ?ride=off locks the tabletop view, ?ride=on starts in the cockpit; desktop default = chase. */
 async function driveSandbox() {
   const forced = params.get('ride') === 'off';
   ctx.drive = createDriveSession(ctx, { forced });
-  await ctx.drive.view.setMode(forced ? 'table' : 'cockpit');
+  const r = params.get('ride');
+  await ctx.drive.view.setMode(forced ? 'table' : r === 'on' ? 'cockpit' : engine.isXR() ? 'cockpit' : 'chase');
   ctx.drive.start();
 }
 

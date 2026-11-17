@@ -3,7 +3,7 @@
 // strip runs along +x at z = STRIP.z and ends at the canyon rim (x ≈ RIM_X), like the road in the opening film.
 export const DECK_Y = 6;                                                     // tower deck height
 export const STRIP = { z: -14, gateX: -45, startX: -150, endX: 100, width: 8, rulerM: 140 };   // ruler 0…140 m from the gate (oil at 70 km/h ≈ 128 m)
-export const TRACK_ORIGIN = { x: 60, y: 0, z: -260 };                       // where track.js (0,0) sits
+export const TRACK_ORIGIN = { x: 0, y: 0, z: 0 };                           // track.js points are world metres
 export const RIM_X = 102;                                                   // near canyon rim beside the strip end
 
 // Golden hour, the sun low over the plateau ahead-left of the tower: it lights the far canyon wall (which faces

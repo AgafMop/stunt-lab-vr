@@ -9,7 +9,8 @@ import { createDriveSession } from '../core/driveSession.js';
 import { autopilot } from '../game/autopilot.js';
 import { assistInput } from '../game/assist.js';
 import { classifyStart, makeRng } from '../game/model.js';
-import { START_DRILLS, LIGHTS, GHOST_SPEED, WET_RUSH } from '../game/config.js';
+import { START_DRILLS, LIGHTS, GHOST, WET_RUSH } from '../game/config.js';
+import { speedProfile } from '../game/track.js';
 import { reactionDistance } from '../game/model.js';
 
 const AUTO_REACTION_MS = 250;
@@ -31,7 +32,8 @@ export async function run(ctx, scope) {
   });
 
   // ---- 1. view choice ----
-  let view = ride === 'off' ? 'table' : ride === 'on' ? 'cockpit' : null;
+  // desktop: straight into the racing-game chase view (V switches to the driver's seat); headset: the student chooses
+  let view = ride === 'off' ? 'table' : ride === 'on' ? 'cockpit' : ride === 'chase' ? 'chase' : engine.isXR() ? null : 'chase';
   if (!view) {
     const g = boardAtStation(ctx, scope, 'tower', { dist: 1.0, height: 1.3 }); g.name = 'viewChoice';
     let pick; const chosen = new Promise(res => { pick = res; });
@@ -59,10 +61,12 @@ export async function run(ctx, scope) {
   const lights = scope.add(gantry());
   const placeLights = () => {
     if (drive.view.mode === 'cockpit') { drive.car3d.add(lights); lights.position.set(0, 1.75, 4.5); lights.rotation.set(0, Math.PI, 0); lights.scale.setScalar(1.6); }
+    else if (drive.view.mode === 'chase') { drive.car3d.add(lights); lights.position.set(0, 4.2, 18); lights.rotation.set(0, Math.PI, 0); lights.scale.setScalar(3.2); }   // a start gantry over the road
     else { ctx.lab.anchors.A_table.add(lights); lights.position.set(0, 0.62, -1.5); lights.rotation.set(0, 0, 0); lights.scale.setScalar(1.5); }   // far edge of the table, just under eye level
   };
   placeLights();
-  const offPlace = engine.onFrame(() => { if ((drive.view.mode === 'cockpit') !== (lights.parent === drive.car3d)) placeLights(); });
+  let placedFor = drive.view.mode;
+  const offPlace = engine.onFrame(() => { if (drive.view.mode !== placedFor) { placedFor = drive.view.mode; placeLights(); } });
   scope.add(offPlace);
   let timesList = [];
   const times = scope.add(ui.panel({ w: 1.0, h: 0.16, name: 'reactionTimes', viewDist: 2, draw: (c, W, H) => drawTimes(ui, c, W, H, timesList) }));
@@ -132,18 +136,42 @@ export async function run(ctx, scope) {
   const track = drive.track;
   const ghost = ctx.lab.makeCar(0x3cc4bc); ctx.lab.world.add(ghost); scope.add(ghost);
   ghost.traverse(o => { o.castShadow = false; });                     // keeps the cockpit lap inside the triangle budget
-  const ghostMini = ctx.lab.makeCar(0x3cc4bc); ghostMini.scale.setScalar(2.2); ctx.lab.mini.add(ghostMini); scope.add(ghostMini);
-  let gs = 0, done = false, progress = 0, lastS = 0, armed = false;
+  const ghostMini = ctx.lab.makeCar(0x3cc4bc); ghostMini.scale.setScalar(ctx.lab.TABLE.carScale); ghostMini.userData.follow = false;
+  ctx.lab.mini.add(ghostMini); scope.add(ghostMini);
+  // Bumper drives a real racing line: brakes before the corners, slows for the wet one (GHOST: a beatable pace)
+  const ghostPace = speedProfile(track, GHOST);
+  let gs = 0, done = false, progress = 0, lastS = 0, armed = false, raceT = 0, ghostT = null;
+  // Bumper's lane: drifts across the road like a driver would, and moves over to pass (never drives through the student)
+  let lane = 2.5;
+  const ghostLane = dt => {
+    const c = drive.car, cs = c.near?.s ?? 0, cp = track.sample(cs);
+    let ds = cs - gs; if (ds > track.length / 2) ds -= track.length; if (ds < -track.length / 2) ds += track.length;
+    const cu = (c.x - cp.x) * cp.tz - (c.z - cp.z) * cp.tx;                // the student's offset (left +)
+    let want = 2.2 * Math.cos(gs / 140);
+    if (Math.abs(ds) < 14) want = cu > 0 ? -3.2 : 3.2;                      // alongside: take the other half of the road
+    lane += (want - lane) * Math.min(1, dt * 1.6);
+    return lane;
+  };
+  let laneNow = lane;
   const placeGhost = () => {
-    const p = track.sample(gs), h = Math.atan2(p.tx, p.tz);
-    ghost.position.set(ctx.lab.track3d.position.x + p.x + p.tz * 2.5, 0, ctx.lab.track3d.position.z + p.z - p.tx * 2.5); ghost.rotation.y = h;
-    ghostMini.position.set(p.x + p.tz * 2.5, 0, p.z - p.tx * 2.5); ghostMini.rotation.y = h;
+    const p = track.sample(gs), q = track.sample(gs + 3), h = Math.atan2(q.x - p.x, q.z - p.z), u = laneNow;
+    ghost.position.set(ctx.lab.track3d.position.x + p.x + p.tz * u, 0, ctx.lab.track3d.position.z + p.z - p.tx * u); ghost.rotation.y = h;
+    ctx.lab.placeMini(ghostMini, { x: p.x + p.tz * u, z: p.z - p.tx * u, heading: h }, false);
   };
   placeGhost();
-  const offGhost = engine.onFrame(dt => { if (!done) { gs = Math.min(track.length, gs + GHOST_SPEED * dt * (ctx.auto ? ctx.animSpeed : 1)); placeGhost(); } });
+  let racing = false;
+  const offGhost = engine.onFrame(dt => {
+    if (!racing || done) return;
+    const k = dt * (ctx.auto ? ctx.animSpeed : 1);
+    raceT += k;
+    if (gs < track.length) { gs = Math.min(track.length, gs + ghostPace(gs) * k); if (gs >= track.length) ghostT = raceT; }
+    laneNow = ghostLane(k);
+    placeGhost();
+    ctx.raceHud?.update({ t: raceT, progress, ghost: gs, length: track.length, speed: drive.car.speed, car: drive.car, ghostPos: ghost.position });
+  });
   scope.add(offGhost);
   const offStep = drive.onStep(car => {
-    const { s } = track.nearest(car.x, car.z);
+    const { s } = car.near;
     let ds = s - lastS; if (ds < -track.length / 2) ds += track.length; if (ds > track.length / 2) ds -= track.length;
     if (Math.abs(ds) < 20) progress += ds;                       // respawns jump; ignore those
     lastS = s;
@@ -156,17 +184,24 @@ export async function run(ctx, scope) {
     if (progress >= track.length - 3) done = true;
   });
   scope.add(offStep);
-  // steering help (default on, ?assist=off): the car holds the racing line, the student drives gas and brake; a firm
-  // turn of the wheel/stick overrides it. The wet-corner lesson still happens: friction, not steering, limits the turn.
-  const assist = params.get('assist') !== 'off';
+  // steering help (assist.js): the student always steers; 'light' blends in a share of the racing line (headset
+  // default — thumbstick / wheel), 'off' on desktop. ?assist=off|light overrides. It never brakes for the student.
+  const assist = params.get('assist') ?? (engine.isXR() ? 'light' : 'off');
   game.s.flags.assist = assist;
-  if (ctx.auto) drive.setDriver(car => autopilot(car, track, 15));
-  else if (assist) drive.setDriver((car, cur) => assistInput(car, track, cur));   // + a governor on the dry corners
+  const autoPace = speedProfile(track, { margin: 0.7 });
+  if (ctx.auto) drive.setDriver((car, cur, near) => autopilot(car, track, autoPace, near));
+  else if (assist !== 'off') drive.setDriver((car, cur, near) => assistInput(car, track, cur, assist, near));
   drive.freeze(false);
+  racing = true;
+  ctx.raceHud?.show(track, drive.car);
+  if (engine.isXR() && drive.view.mode === 'cockpit') ctx.raceHud?.attachXR(ui, drive.car3d);
+  scope.add(() => ctx.raceHud?.hide());
   ctx.task?.set('race_lap');
   await scope.say('race_go');
   await scope.guard(new Promise(res => { const off = engine.onFrame(() => { if (done) { off(); res(); } }); scope.add(off); }));
   game.s.flags.lapDone = true;
+  game.s.race = { time: raceT, ghostTime: ghostT ?? raceT + (track.length - gs) / 15, won: gs < track.length };
+  ctx.raceHud?.finish(game.s.race);
   ctx.task?.clear();
   drive.freeze(true);
   drive.setDriver(null);

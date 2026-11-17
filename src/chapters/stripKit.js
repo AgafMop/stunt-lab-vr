@@ -81,10 +81,10 @@ export function makeDriver(ctx, kind) {
   const suit = new THREE.MeshStandardMaterial({ color: 0x7a1414, roughness: 0.6 });
   const helmet = new THREE.MeshStandardMaterial({ color: 0x8e1a1a, roughness: 0.25, metalness: 0.3 });
   const visor = new THREE.MeshStandardMaterial({ color: 0x14100e, roughness: 0.05, metalness: 0.9 });
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.34, 4, 10), suit); torso.position.y = 0.78; g.add(torso);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.3, 4, 10), suit); torso.position.y = 0.74; g.add(torso);
   for (const s of [-1, 1]) { const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.32, 3, 8), suit); arm.position.set(s * 0.2, 0.78, 0.15); arm.rotation.x = 1.0; g.add(arm); }
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 20, 14), helmet); head.position.y = 1.18; g.add(head);
-  const v = new THREE.Mesh(new THREE.SphereGeometry(0.152, 20, 10, -0.9, 1.8, 1.1, 0.75), visor); v.position.y = 1.18; v.rotation.y = 0; g.add(v);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 20, 14), helmet); head.position.y = 1.1; g.add(head);   // under the new car's roof (headliner y 1.27)
+  const v = new THREE.Mesh(new THREE.SphereGeometry(0.137, 20, 10, -0.9, 1.8, 1.1, 0.75), visor); v.position.y = 1.1; v.rotation.y = 0; g.add(v);
   g.position.set(0.38, 0, -0.45);
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   return g;

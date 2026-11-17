@@ -1,37 +1,32 @@
-// Steering assist: a student who just holds the gas (and never steers) never leaves the track at a DRY corner; the wet
-// corner stays the lesson — rushed, it still slides into the sand (then the game respawns the car, as here).
+// Steering help: only blends, never switches or brakes; the student's own firm steering dominates; 'off' is pure input.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assistInput } from '../src/game/assist.js';
 import { createCar, stepCar } from '../src/game/carSim.js';
-import { TRACK_DEF, buildTrack, surfaceAt, respawn, OFFTRACK_RESPAWN_S } from '../src/game/track.js';
+import { TRACK_DEF, buildTrack, surfaceAt } from '../src/game/track.js';
 
-function lap(cur, seconds = 120) {
-  const track = buildTrack(TRACK_DEF), st = track.sample(0);
-  const car = createCar({ x: st.x, z: st.z, heading: Math.atan2(st.tx, st.tz) });
-  const h = 1 / 120, exits = [];
-  let lastS = 0, progress = 0, sand = 0, prev = 'dry';
-  for (let i = 0; i < seconds / h && progress < track.length; i++) {
-    const surface = surfaceAt(track, car.x, car.z);
-    const { s } = track.nearest(car.x, car.z);
-    if (surface === 'sand' && prev !== 'sand') exits.push(Math.round(s));
-    prev = surface;
-    let ds = s - lastS; if (ds < -track.length / 2) ds += track.length; if (Math.abs(ds) < 20) progress += ds; lastS = s;
-    stepCar(car, assistInput(car, track, cur), h, surface);
-    sand = surface === 'sand' ? sand + h : 0;
-    if (sand > OFFTRACK_RESPAWN_S) { Object.assign(car, respawn(track, car.x, car.z), { speed: 0 }); sand = 0; }
-  }
-  return { exits, progress, length: track.length, wet: TRACK_DEF.wet };
-}
+const track = buildTrack(TRACK_DEF);
+const st = track.sample(150);
+const car = () => Object.assign(createCar({ x: st.x, z: st.z, heading: Math.atan2(st.tx, st.tz) + 0.2 }), { speed: 15 });
 
-test('full gas, no steering: never off the track at a dry corner, and the lap completes', () => {
-  const r = lap({ throttle: 1, brake: 0, steer: 0 });
-  const dryExits = r.exits.filter(s => s < r.wet[0] - 5 || s > r.wet[1] + 15);
-  assert.deepEqual(dryExits, [], `exits at s = ${r.exits.join(', ')}`);
-  assert.ok(r.progress >= r.length - 3, `progress ${r.progress.toFixed(0)} / ${r.length.toFixed(0)}`);
+test("'off' returns the student's input untouched", () => {
+  const cur = { throttle: 0.7, brake: 0, steer: 0.3 };
+  assert.deepEqual(assistInput(car(), track, cur, 'off'), cur);
 });
 
-test('the wet corner is still the lesson: rushed at full gas it slides off', () => {
-  const r = lap({ throttle: 1, brake: 0, steer: 0 });
-  assert.ok(r.exits.some(s => s >= r.wet[0] - 5 && s <= r.wet[1] + 15), `exits at s = ${r.exits.join(', ')}`);
+test("'light' never touches gas or brake, and moves the steering only part of the way", () => {
+  const cur = { throttle: 1, brake: 0, steer: 0 };
+  const out = assistInput(car(), track, cur, 'light');
+  assert.equal(out.throttle, 1); assert.equal(out.brake, 0);
+  assert.ok(Math.abs(out.steer) > 0 && Math.abs(out.steer) < 0.4, `${out.steer}`);
+});
+
+test('steering continuity: the output changes smoothly as the student turns (no jump at any threshold)', () => {
+  const c = car(); let prev = null, maxJump = 0;
+  for (let s = -1; s <= 1.0001; s += 0.01) {
+    const o = assistInput(c, track, { throttle: 0, brake: 0, steer: s }, 'light').steer;
+    if (prev !== null) maxJump = Math.max(maxJump, Math.abs(o - prev));
+    prev = o;
+  }
+  assert.ok(maxJump < 0.03, `max jump ${maxJump}`);
 });

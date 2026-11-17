@@ -30,12 +30,41 @@ export function createScope(ctx) {
         const glowOff = ctx.attention?.(obj) ?? (() => {});            // what to click now glows softly
         ctx.input.register(obj, { onSelect: () => { ctx.audio.sfx('click'); ctx.input.unregister(obj); glowOff(); res(obj); } });
         scope.add(() => { ctx.input.unregister(obj); glowOff(); });
+        if (ctx.params?.has('test')) setTimeout(() => assertVisible(ctx, obj), 120);   // a hidden button = a stuck student
         if (ctx.auto && auto) setTimeout(() => ctx.input.select(obj), 250);
       }));
     },
   };
   return scope;
 }
+
+/** ?test audit: the thing the student must click is on screen and not hidden behind world geometry (rays from the
+ *  camera to its centre and 4 inner corners). Logs a console error — which fails every e2e test. */
+const _ray = new THREE.Raycaster();
+export function assertVisible(ctx, obj) {
+  if (!obj.parent) return;
+  const { engine } = ctx, cam = engine.camera;
+  obj.updateWorldMatrix(true, true);
+  const onTop = o => { for (let p = o; p; p = p.parent) if (p.isMesh && [].concat(p.material).every(m => m.depthTest === false)) return true; return false; };
+  if (onTop(obj)) { if (!inView(cam, obj.getWorldPosition(new THREE.Vector3()))) console.error(`UI off screen: ${obj.name}`); return; }
+  const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3()), h = box.getSize(new THREE.Vector3()).multiplyScalar(0.3);
+  const pts = [c, c.clone().add(new THREE.Vector3(h.x, h.y, 0)), c.clone().add(new THREE.Vector3(-h.x, -h.y, 0)), c.clone().add(new THREE.Vector3(-h.x, h.y, h.z)), c.clone().add(new THREE.Vector3(h.x, -h.y, -h.z))];
+  const eye = cam.getWorldPosition(new THREE.Vector3());
+  const isMine = o => { for (let p = o; p; p = p.parent) if (p === obj) return true; for (let p = obj; p; p = p.parent) if (p === o) return true; return false; };
+  const solid = o => o.visible && o.isMesh && !o.userData.ui && o.name !== 'attention' && [].concat(o.material).every(m => m.visible !== false && (!m.transparent || m.opacity > 0.5) && m.colorWrite !== false);
+  let hidden = 0, off = 0;
+  for (const p of pts) {
+    if (!inView(cam, p)) { off++; continue; }
+    const d = p.clone().sub(eye), dist = d.length();
+    _ray.set(eye, d.normalize()); _ray.near = 0.01; _ray.far = dist - 0.02;
+    const hits = _ray.intersectObject(engine.scene, true).filter(x => solid(x.object) && !isMine(x.object) && visibleChain(x.object));
+    if (hits.length) hidden++;
+  }
+  if (off === pts.length) console.error(`UI off screen: ${obj.name || obj.parent?.name}`);
+  else if (hidden >= 3) console.error(`UI hidden behind the world: ${obj.name || obj.parent?.name}`);
+}
+function visibleChain(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
+function inView(cam, p) { const v = p.clone().project(cam); return v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }
 
 /** A board group at a lab anchor (uses the anchor's `yaw` extra so it faces the station). */
 export function board(ctx, scope, anchorName, offset = [0, 0, 0]) {
@@ -88,8 +117,29 @@ export function boardAtStation(ctx, scope, stationId, { dist = 1.0, height = 1.2
     void s;
   }
   ctx.engine.scene.add(g); scope.add(g);
+  if (ctx.loco?.following && !ctx.params?.has("noontop")) keepOnTop(ctx, scope, g);   // in a car: the dash, pillars and body must never hide a board
   if (ctx.params?.has('tour')) ctx.tourPending = (ctx.tourPending || 0) + 1;   // ?tour: screenshot once it renders
   return g;
+}
+
+/** Draw everything in `g` over the world (no depth test), back to front in scene-graph order — for boards that open
+ *  while the student sits in a car. Children added later are picked up on the next frame. */
+export function keepOnTop(ctx, scope, g) {
+  let n = -1;
+  const apply = () => {
+    let order = 8000, count = 0;
+    g.traverse(o => {
+      count++;
+      if (!o.isMesh) return;
+      o.renderOrder = order++;
+      for (const m of [].concat(o.material)) if (m.depthTest) { m.depthTest = false; m.depthWrite = false; m.needsUpdate = true; }
+    });
+    n = count;
+  };
+  apply();
+  g.addEventListener('childadded', apply);                            // at once (the next frame may be late)
+  const off = ctx.engine.onFrame(() => { let c = 0; g.traverse(() => c++); if (c !== n) apply(); });   // grandchildren added later
+  scope.add(off); scope.add(() => g.removeEventListener('childadded', apply));
 }
 
 /** Lay out panels/cards in a row on a board (RTL: first item on the right). */

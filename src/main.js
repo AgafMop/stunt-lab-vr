@@ -165,6 +165,7 @@ async function start(vr) {
       const session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] });
       await engine.renderer.xr.setSession(session);
       session.addEventListener('end', () => { $('boot').hidden = false; });
+      await ctx.loco.calibrated();          // seated height first: boards and cards are placed from the calibrated head
     } catch (e) { console.warn('VR session refused', e); $('boot').hidden = false; return; }
   } else if (!ctx.started) {
     $('hint').hidden = false;

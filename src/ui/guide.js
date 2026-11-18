@@ -32,6 +32,9 @@ export function createGuide(ctx) {
   });
   /** Glow around `obj` until the returned function is called (or obj is removed). */
   function attention(obj) {
+    // a card just placed on its board has stale world matrices (Box3.setFromObject updates only the object itself):
+    // without this the first card of a row got its glow at the world origin — the foot of the tower
+    obj.updateWorldMatrix(true, true);
     const box = new THREE.Box3().setFromObject(obj), size = box.getSize(new THREE.Vector3());
     const local = obj.worldToLocal(box.getCenter(new THREE.Vector3()));
     const s = obj.getWorldScale(new THREE.Vector3());
@@ -64,9 +67,10 @@ export function createGuide(ctx) {
   } });
   panel.mesh.name = 'taskCard'; panel.mesh.visible = false; panel.mesh.userData.ui = true;
   const towerHome = new THREE.Group(); towerHome.name = 'taskHome';
-  // ≈ 30° left of the seated student's straight-ahead and ≈ 10° ABOVE the eyes: it covers only sky — the strip, the
-  // number signs and the far track (all below the horizon) stay clear; boards open straight ahead. Faces the chair.
-  towerHome.position.set(-0.45, 6 + 1.33, -2.25);
+  // ≈ 40° left of the seated student's straight-ahead, ≈ 10° above the eyes, 1.25 m: it covers only sky (the strip, the
+  // number signs and the far track are below the horizon) and stays clear of the boards that open straight ahead —
+  // they span up to ≈ 25° left (at 30° it covered the view-choice card in the headset, 2026-11-18). Faces the chair.
+  towerHome.position.set(-0.79, 6 + 1.39, -2.34);
   ctx.lab.root.add(towerHome);
   towerHome.lookAt(0, 6 + 1.17, -1.4);
   // on the face of the dashboard, right of the steering wheel, BELOW the driver's line of sight over the dash (every corner of the

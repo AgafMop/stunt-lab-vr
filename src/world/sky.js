@@ -79,7 +79,10 @@ export function createSky(engine, parent = engine.scene, noise = noiseTexture())
   const dome = new THREE.Mesh(mergeVertices(sg, 1e-3), mat);
   dome.name = 'sky'; dome.renderOrder = -1000; dome.frustumCulled = false;
   const p = new THREE.Vector3();
-  dome.onBeforeRender = (r, s, cam) => { dome.position.copy(cam.getWorldPosition(p)); dome.updateMatrixWorld(); };
+  // read the eye's matrixWorld as three left it — NEVER cam.getWorldPosition(): in XR `cam` is a parentless eye camera
+  // whose matrixWorld three set to rig × head pose; getWorldPosition recomputes it from the raw head pose alone and
+  // the rest of the frame then renders from the real floor (2026-11-18: the headset showed the foot of the tower)
+  dome.onBeforeRender = (r, s, cam) => { dome.position.setFromMatrixPosition(cam.matrixWorld); dome.updateMatrixWorld(); };
   parent.add(dome);                                  // under the set root: the intro cinema hides it with the set
   return dome;
 }

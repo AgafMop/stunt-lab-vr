@@ -110,9 +110,14 @@ export function createLocomotion(engine, input, { room = { x0: -3.7, x1: 3.7, z0
     calib = engine.isXR() && h.y ? { x: h.x, y: h.y, z: h.z, yaw: h.yaw } : { x: 0, y: DESK_EYE, z: 0, yaw: 0 };
   }
 
+  // seated height: once the head pose has settled (30 frames) — the game waits for it (loco.calibrated) so nothing is
+  // placed by the uncalibrated head and then moved when the floor shifts (a standing student shifts it by ~0.5 m)
+  let calibDone = Promise.resolve(), calibRes = null;
+  loco.calibrated = () => calibDone;
   renderer.xr.addEventListener('sessionstart', () => {
+    calibDone = new Promise(r => { calibRes = r; });
     let n = 0;
-    const off = engine.onFrame(() => { if (++n === 30) { off(); loco.recenter(); } });
+    const off = engine.onFrame(() => { if (++n === 30) { off(); loco.recenter(); calibRes(); } });
   });
   renderer.xr.addEventListener('sessionend', () => { rig.position.y = offset.y + baseY; camera.position.set(0, DESK_EYE, 0); });
 

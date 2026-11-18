@@ -37,10 +37,13 @@ export const CAR = {
   reverse: 4,            // m/s top reverse speed (brake held at a standstill)
   wheelbase: 2.7,
   maxSteer: 0.55,        // rad, the wheels' full lock at walking pace
-  steerRate: 3.2,        // full-lock fractions per second the wheels can turn
-  gripAsk: 1.08,         // full lock asks this × the dry grip at speed (a little over: the limit is felt, not hidden)
-  yawLag: 0.13,          // s, the body's yaw response time
-  steerCurve: 1.6,       // response curve: small inputs (a key tap, a nudge of the stick) turn gently
+  steerRate: 6,          // full-lock fractions per second the wheels can turn (arcade: quick hands)
+  gripAsk: 1.05,         // full lock asks this × the (arcade) dry grip at speed (a little over: the limit is felt, not hidden)
+  // SIDEWAYS grip × μ — arcade handling on dry tarmac (like the racing games students know); the wet keeps far less of
+  // that bonus so the wet corner stays the lesson. Braking stays exactly μ·g on every surface (the science).
+  arcadeGrip: { dry: 1.7, wet: 1.15, sand: 1, oil: 1 },
+  yawLag: 0.07,          // s, the body's yaw response time
+  steerCurve: 1.2,       // response curve: small inputs (a key tap, a nudge of the stick) turn a little gentler
 };
 
 export function createCar({ x = 0, z = 0, heading = 0 } = {}) {
@@ -51,7 +54,7 @@ export function createCar({ x = 0, z = 0, heading = 0 } = {}) {
 export function lockCurvature(speed) {
   const geo = Math.tan(CAR.maxSteer) / CAR.wheelbase;
   const v2 = speed * speed;
-  return v2 > 1e-6 ? Math.min(geo, (CAR.gripAsk * MU.dry * G) / v2) : geo;
+  return v2 > 1e-6 ? Math.min(geo, (CAR.gripAsk * CAR.arcadeGrip.dry * MU.dry * G) / v2) : geo;
 }
 
 /** One fixed step h (s). input: { throttle 0..1, brake 0..1, steer -1..1 }. Mutates and returns the car. */
@@ -82,7 +85,7 @@ export function stepCar(car, { throttle = 0, brake = 0, steer = 0, park = false 
 
   // ---- lateral: friction circle (hard braking leaves less grip for turning) ----
   const used = Math.min(1, Math.abs(aLong) / grip);
-  const latMax = grip * Math.sqrt(Math.max(0.15, 1 - 0.8 * used * used));
+  const latMax = (CAR.arcadeGrip[surface] ?? 1) * grip * Math.sqrt(Math.max(0.3, 1 - 0.6 * used * used));
   const sp = Math.abs(car.speed);
   const kAsk = Math.sign(car.steer) * Math.abs(car.steer) ** CAR.steerCurve * lockCurvature(sp);   // > 0 = right; gentle near centre
   let kGet = kAsk;

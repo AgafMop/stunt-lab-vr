@@ -27,6 +27,15 @@ const CSS = `
 #raceHud .finish h2 { margin:0 0 6px; font-size:30px; color:#ffb347; }
 #raceHud .finish p { margin:2px 0; font-size:18px; font-weight:600; }
 #raceHud .finish .num { direction:ltr; display:inline-block; font-variant-numeric:tabular-nums; font-weight:800; }
+#startLights { position:fixed; left:50%; top:130px; transform:translateX(-50%); z-index:6; pointer-events:none; text-align:center; font-family:Heebo, "Segoe UI", sans-serif; }
+#startLights .bar { display:inline-flex; gap:16px; padding:16px 22px; background:linear-gradient(180deg,#15181f,#0a0c11); border-radius:20px; border:2px solid #2a2f3a; box-shadow:0 12px 34px rgba(0,0,0,.45); direction:ltr; }
+#startLights .bar i { width:58px; height:58px; border-radius:50%; background:radial-gradient(circle at 40% 35%, #4a1010, #240606); box-shadow:inset 0 0 0 3px #000; transition:background .05s; }
+#startLights .bar i.on { background:radial-gradient(circle at 40% 35%, #ff8a80, #ff1a1a 45%, #a00000); box-shadow:inset 0 0 0 3px #000, 0 0 26px 6px rgba(255,40,40,.65); }
+#startLights .times { margin-top:12px; display:inline-flex; gap:10px; direction:ltr; }
+#startLights .times b { min-width:110px; padding:8px 14px; border-radius:12px; background:rgba(8,12,20,.9); color:#eef2f8; font-size:28px; font-weight:800; font-variant-numeric:tabular-nums; border:1px solid rgba(255,179,71,.35); }
+#startLights .times b.empty { color:#56637a; }
+#startLights .lbl { display:inline-block; color:#ffb347; font-size:16px; font-weight:700; margin-top:8px; padding:3px 14px; border-radius:999px; background:rgba(8,12,20,.85); }
+#startLights .lbl + .times { display:flex; justify-content:center; }
 @media (max-width: 760px) { #raceHud .map { width:150px; height:150px; } #raceHud .map canvas { width:150px; height:150px; } #raceHud .speedo { transform:scale(.8); transform-origin:bottom right; } }
 `;
 
@@ -65,6 +74,11 @@ export function createRaceHud(engine) {
       <div class="num">0</div><div class="unit">קמ״ש</div></div>
     <div class="panel finish"><h2></h2><p class="you"></p><p class="bumper"></p></div>`;
   document.body.appendChild(root);
+  // desktop start lights (big, at the top of the screen — the 3D gantry is too far away to read in the chase camera)
+  const sl = document.createElement('div'); sl.id = 'startLights'; sl.hidden = true;
+  sl.innerHTML = '<div class="bar"><i></i><i></i><i></i><i></i><i></i></div><div class="lbl">זמני התגובה שלך</div><div class="times"></div>';
+  document.body.appendChild(sl);
+  const bulbs = [...sl.querySelectorAll('.bar i')], timesEl = sl.querySelector('.times');
   const $ = q => root.querySelector(q);
   const tEl = $('.t'), gapEl = $('.gap'), barEl = $('.bar i'), ghostTick = $('.bar b'), numEl = $('.num'), arc = $('.arc');
   const cv = $('.map canvas'), g = cv.getContext('2d');
@@ -101,6 +115,18 @@ export function createRaceHud(engine) {
 
   let dash = null;
   const hud = {
+    /** Start lights on desktop: show(true/false), lit(n), times([s, …], slots). */
+    lights: {
+      show(on) { sl.hidden = !on || engine.isXR(); },
+      lit(n) { bulbs.forEach((b, i) => b.classList.toggle('on', i < n)); },
+      times(list, slots = 3) {
+        timesEl.replaceChildren(...Array.from({ length: slots }, (_, i) => {
+          const b = document.createElement('b');
+          if (list[i] != null) b.textContent = Math.round(list[i] * 1000) + ' ms'; else { b.textContent = '—'; b.className = 'empty'; }
+          return b;
+        }));
+      },
+    },
     /** The headset version (call once the car exists): a dash display. */
     attachXR(ui, car3d) { dash?.dispose(); dash = dashDisplay(ui, car3d); },
     show(tr) { if (engine.isXR()) return; track = tr; drawBase(); root.hidden = false; $('.finish').classList.remove('on'); },

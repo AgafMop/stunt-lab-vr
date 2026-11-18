@@ -5,12 +5,12 @@ import { keySteerStep, KEY } from '../src/game/keySteer.js';
 
 const run = (want, seconds, speed, cur = 0) => { for (let t = 0; t < seconds; t += 1 / 120) cur = keySteerStep(cur, want, 1 / 120, speed); return cur; };
 
-test('held at walking pace: full lock in about 0.12 s', () => {
-  assert.ok(run(1, 0.06, 2) < 0.6);
-  assert.ok(Math.abs(run(1, 0.2, 2) - 1) < 0.02);
+test('held at walking pace: full lock in well under 0.1 s (arcade)', () => {
+  assert.ok(run(1, 0.03, 2) < 0.7);
+  assert.ok(Math.abs(run(1, 0.1, 2) - 1) < 0.02);
 });
-test('held at top speed: eased in over ≈ 0.35 s, capped at 85 %', () => {
-  assert.ok(run(1, 0.1, 26) < 0.35);
+test('held at top speed: eased in over ≈ 0.16 s, capped at 90 %', () => {
+  assert.ok(run(1, 0.05, 26) < 0.5);
   assert.equal(run(1, 1, 26), KEY.capAtTop);
 });
 test('released: springs back faster than it went in, and never overshoots past centre', () => {

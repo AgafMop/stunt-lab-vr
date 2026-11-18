@@ -60,15 +60,15 @@ test('yaw inertia: the turn builds up smoothly (no instant yaw rate)', () => {
   assert.ok(r1 < Math.abs(car.yawRate) * 0.15, `${r1} vs ${car.yawRate}`);
 });
 
-test('full lock at speed asks for a little more than the dry grip: a firm limit turn, never tighter than v²/(μg)', () => {
+test('arcade grip: full lock at speed is a firm limit turn, never tighter than v²/(arcade·μg); the wet keeps less bonus', () => {
   for (const [v, surface] of [[25, 'dry'], [25, 'wet'], [18, 'dry']]) {
     const car = createCar(); car.speed = v; car.steer = 1;
     run(car, { throttle: 0.3, brake: 0, steer: 1 }, 1.2, surface);
     const R = Math.abs(car.speed / car.yawRate);
-    assert.ok(R >= car.speed ** 2 / (MU[surface] * G) * 0.98, `${surface} ${v}: R ${R.toFixed(1)}`);
+    assert.ok(R >= car.speed ** 2 / (CAR.arcadeGrip[surface] * MU[surface] * G) * 0.98, `${surface} ${v}: R ${R.toFixed(1)}`);
   }
-  assert.ok(lockCurvature(25) * 25 * 25 > MU.dry * G);           // asks for more than the grip…
-  assert.ok(lockCurvature(25) * 25 * 25 < 1.2 * MU.dry * G);     // …but only a little
+  assert.ok(lockCurvature(25) * 25 * 25 > CAR.arcadeGrip.dry * MU.dry * G);
+  assert.ok(CAR.arcadeGrip.wet * MU.wet < 0.6 * CAR.arcadeGrip.dry * MU.dry, 'wet is clearly more slippery');
 });
 
 test('too fast on wet: the car goes straighter than asked (understeer) and its body slides', () => {

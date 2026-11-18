@@ -59,19 +59,32 @@ export async function run(ctx, scope) {
 
   // ---- 2. start-light drill ----
   const lights = scope.add(gantry());
+  // desktop: the lights + the reaction times also as a big overlay at the top of the screen (readable in any view);
+  // in the chase camera the 3D lights are hidden (too far away to read)
+  const hudL = engine.isXR() ? null : ctx.raceHud?.lights;
+  let drillOn = true;
+  if (hudL) {
+    const setLit0 = lights.userData.setLit, setAll0 = lights.userData.setAll;
+    lights.userData.setLit = n => { setLit0(n); hudL.lit(n); };
+    lights.userData.setAll = v => { setAll0(v); hudL.lit(v ? 5 : 0); };
+    hudL.lit(0); hudL.times([], START_DRILLS); hudL.show(true);
+    scope.add(() => hudL.show(false));
+  }
   const placeLights = () => {
     if (drive.view.mode === 'cockpit') { drive.car3d.add(lights); lights.position.set(0, 1.75, 4.5); lights.rotation.set(0, Math.PI, 0); lights.scale.setScalar(1.6); }
     else if (drive.view.mode === 'chase') { drive.car3d.add(lights); lights.position.set(0, 4.2, 18); lights.rotation.set(0, Math.PI, 0); lights.scale.setScalar(3.2); }   // a start gantry over the road
     else { ctx.lab.anchors.A_table.add(lights); lights.position.set(0, 0.62, -1.5); lights.rotation.set(0, 0, 0); lights.scale.setScalar(1.5); }   // far edge of the table, just under eye level
   };
   placeLights();
+  const lightsVis = () => { lights.visible = drillOn && !(hudL && drive.view.mode === 'chase'); };
+  lightsVis();
   let placedFor = drive.view.mode;
-  const offPlace = engine.onFrame(() => { if (drive.view.mode !== placedFor) { placedFor = drive.view.mode; placeLights(); } });
+  const offPlace = engine.onFrame(() => { if (drive.view.mode !== placedFor) { placedFor = drive.view.mode; placeLights(); lightsVis(); } });
   scope.add(offPlace);
   let timesList = [];
   const times = scope.add(ui.panel({ w: 1.0, h: 0.16, name: 'reactionTimes', viewDist: 2, draw: (c, W, H) => drawTimes(ui, c, W, H, timesList) }));
   lights.add(times.mesh); times.mesh.position.set(0, -0.24, 0);
-  const showTimes = list => { timesList = [...list]; times.redraw(); };
+  const showTimes = list => { timesList = [...list]; times.redraw(); hudL?.times(timesList, START_DRILLS); };
   game.s.reaction = { simple: [], falseStarts: 0 };
   const rng = makeRng(game.s.seed * 13 + 5);
   let forceFalse = params.has('forcefalse');
@@ -105,7 +118,8 @@ export async function run(ctx, scope) {
     }
     await scope.wait(700);
   }
-  lights.visible = false;
+  drillOn = false; lights.visible = false;
+  if (hudL) setTimeout(() => hudL.show(false), 1800);                     // the three times stay a moment, then the card explains them
 
   // ---- 2b. what the reaction time MEANS (spec §6: d_r = v · t_r) — it is used again on the strip and in the stunt ----
   const tr = game.s.reaction.mean = game.s.reaction.simple.reduce((a, b) => a + b, 0) / game.s.reaction.simple.length;

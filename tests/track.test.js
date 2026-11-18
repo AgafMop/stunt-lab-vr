@@ -123,7 +123,7 @@ test('a keyboard driver (on/off keys, 150 ms late, through keySteer like driveIn
   }, { seconds: 260 });
   assert.ok(r.travelled >= track.length, `${r.travelled.toFixed(0)} m`);
   assert.ok(r.exits.length === 0, `exits at ${r.exits.join(', ')}`);
-  assert.ok(r.maxLat < 2, `weaves ${r.maxLat.toFixed(2)} m on the start straight`);
+  assert.ok(r.maxLat < 2.5, `weaves ${r.maxLat.toFixed(2)} m on the start straight`);
 });
 
 test('rushing the wet corner at 25 m/s ends in the sand; 15 m/s holds', () => {

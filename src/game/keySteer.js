@@ -3,7 +3,7 @@
 //   · at speed a held key asks for a little less lock (85 % at top speed; with the car's response curve ≈ ¾ of the
 //     grip) — a tap is a lane change, not a spin, yet a held key still takes the tightest corner at its speed.
 // Analog input (thumbstick, the gripped wheel) never goes through this: it is already proportional.
-export const KEY = { rampSlow: 0.12, rampFast: 0.35, back: 0.6, capAtTop: 0.85, vTop: 26 };
+export const KEY = { rampSlow: 0.06, rampFast: 0.16, back: 0.7, capAtTop: 0.9, vTop: 26 };   // arcade: snappy
 
 /** One step: current key steer, wanted direction (−1, 0, 1), dt (s), car speed (m/s) → new key steer (−1..1). */
 export function keySteerStep(cur, want, dt, speed) {

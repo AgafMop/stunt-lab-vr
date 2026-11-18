@@ -1,5 +1,6 @@
 // A drivable car on the race track: sim (fixed step) + input + view + getting back on the road.
 // Used by the ?fx=drive sandbox and by the race chapter.
+// Sound: engine, tyre squeal, gravel, barrier thuds (carSound.js; ?mute silences it).
 // Off the road: sand drags the car down, the student can drive back. The game only puts the car back on the road
 // when it is far out (> 22 m), stuck in the sand (no progress for 3 s), or when the student asks (R / B button).
 import { createCar, stepCar, createStepper } from '../game/carSim.js';
@@ -8,6 +9,7 @@ import { createDriveInput } from './driveInput.js';
 import { createDriveView } from './driveView.js';
 import { rimX } from '../world/terrainFn.js';
 import { buildBarriers, collide } from '../game/barriers.js';
+import { createCarSound } from './carSound.js';
 import { TRACK_ORIGIN } from '../world/layout.js';
 
 const ZERO = { throttle: 0, brake: 0, steer: 0, controllers: false };
@@ -26,7 +28,7 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
   const input = createDriveInput(engine, ctx.input, { car3d, speed: () => car.speed });
   const view = createDriveView(ctx, { car3d, forced });
   const walls = buildBarriers(track, TRACK_ORIGIN);
-  let lastBump = 0;
+  let lastBump = 0, sound = null, lastIn = ZERO;
   let running = false, frozen = false, respawning = false, cur = ZERO, driver = null, stuck = 0, resetAsked = false;
   const stepListeners = new Set();
 
@@ -34,10 +36,12 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
     const near = car.near = track.nearest(car.x, car.z);
     const [w0, w1] = track.def.wet;
     const surface = near.dist > track.def.width / 2 ? 'sand' : near.s >= w0 && near.s <= w1 ? 'wet' : 'dry';
-    stepCar(car, frozen ? PARK : driver ? driver(car, cur, near) : cur, h, surface);
+    const inp = frozen ? PARK : driver ? driver(car, cur, near) : cur;
+    lastIn = frozen ? { throttle: cur.throttle, brake: 0 } : inp;           // parked at the lights the gas still revs the engine
+    stepCar(car, inp, h, surface);
     car.surface = surface;
     car.hit = collide(car, track, walls, near);                       // tyre walls, guardrail, gantry, grandstand are solid
-    if (car.hit > 2.5 && performance.now() - lastBump > 400) { lastBump = performance.now(); ctx.audio?.sfx?.('no'); }
+    if (car.hit > 2.5 && performance.now() - lastBump > 400) { lastBump = performance.now(); sound?.bump(car.hit); }
     car.offTrack = surface === 'sand' ? car.offTrack + h : 0;
     stuck = surface === 'sand' && Math.abs(car.speed) < 1.2 ? stuck + h : 0;
     for (const fn of stepListeners) fn(car, h);
@@ -66,6 +70,7 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
     cur = input.read();
     stepper(dt * timeScale);
     view.update(car, dt);
+    sound?.update(car, lastIn, dt);
     if (!respawning && needsRescue()) doRespawn();
   });
 
@@ -90,8 +95,8 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
 
   return {
     car, car3d, view, input, track,
-    start() { running = true; view.update(car, 0); },
-    stop() { running = false; },
+    start() { running = true; view.update(car, 0); if (!sound && !ctx.params?.has('mute')) sound = createCarSound(ctx.audio); },
+    stop() { running = false; sound?.stop(); sound = null; },
     /** Hold the car still (brakes on, no creeping into reverse) — e.g. before the start lights. */
     freeze(v) { frozen = v; },
     /** Replace the student's input by a function (car, studentInput, near) → input, or null. */
@@ -104,7 +109,7 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
       view.update(car, 0);
     },
     dispose() {
-      running = false; offFrame(); offX(); removeEventListener('keydown', onKey);
+      running = false; offFrame(); offX(); removeEventListener('keydown', onKey); sound?.stop(); sound = null;
       input.dispose(); view.dispose(); lab.world.remove(car3d);
     },
   };

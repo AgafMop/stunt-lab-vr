@@ -94,9 +94,15 @@ export function createResultsBoard(ctx, { surface = null } = {}) {
     });
   }
 
-  // homes: XR front-right above the horizon (sky only); desktop lower so the pitched view sees it; focus = in front
+  // homes: XR front-right above the horizon (sky only); focus = in front of the student (the graph chapter).
+  // Desktop: a fixed card in the top-right corner of the screen (DOM, a copy of the same canvas): over the sky, never
+  // over the strip, so the cars stay in view on every run (the 3D board there covered the fast runs' stopping zone).
   const home = new THREE.Group(); home.name = 'resultsHome'; ctx.lab.root.add(home);
   home.add(panel.mesh);
+  const dom = deskCard(panel);
+  const redraw0 = panel.redraw.bind(panel);
+  panel.redraw = (...a) => { redraw0(...a); dom.copy(); };
+  dom.copy();
   const eyeY = 6 + 1.17;
   let focused = false;
   const place = () => {
@@ -104,10 +110,14 @@ export function createResultsBoard(ctx, { surface = null } = {}) {
     else if (engine.isXR()) home.position.set(0.95, eyeY + 0.32, -2.3);
     else home.position.set(0.95, eyeY - 0.38, -2.45);
     home.lookAt(0, eyeY, -1.4);
+    home.visible = focused || engine.isXR();
   };
   place();
   let lastXR = engine.isXR();
-  const offFrame = engine.onFrame(() => { if (engine.isXR() !== lastXR) { lastXR = engine.isXR(); place(); } });
+  const offFrame = engine.onFrame(() => {
+    if (engine.isXR() !== lastXR) { lastXR = engine.isXR(); place(); }
+    dom.show(!focused && !engine.isXR() && panel.mesh.visible);
+  });
   const offTrial = game.on?.('trial', () => panel.redraw()) ?? (() => {});
   const board = {
     panel, mesh: panel.mesh,
@@ -118,8 +128,31 @@ export function createResultsBoard(ctx, { surface = null } = {}) {
     pair(a, b, da, db) { pairs.push({ a, b, da, db }); panel.redraw(); },
     clearPairs() { pairs = []; panel.redraw(); },
     focus(on) { focused = on; place(); },
-    dispose() { offFrame(); offTrial(); home.removeFromParent(); panel.dispose(); },
+    dispose() { offFrame(); offTrial(); dom.dispose(); home.removeFromParent(); panel.dispose(); },
+    /** Desktop: the card's screen rectangle (null when hidden) — the test checks it never covers a run. */
+    deskRect: () => dom.rect(),
   };
   void surface;
   return board;
+}
+
+/** The desktop copy of the board: a DOM canvas in the top-right corner, under the meter. */
+function deskCard(panel) {
+  const el = document.createElement('canvas'); el.id = 'resultsCard';
+  el.width = panel.canvas.width; el.height = panel.canvas.height;
+  Object.assign(el.style, { position: 'fixed', right: '16px', top: '86px', width: 'min(34vw, 500px)', height: 'auto', zIndex: 4,
+    pointerEvents: 'none', display: 'none', filter: 'drop-shadow(0 10px 24px rgba(0,0,0,.4))', transition: 'opacity .3s', opacity: '0' });
+  document.body.appendChild(el);
+  const g = el.getContext('2d');
+  let on = false;
+  return {
+    copy() { g.clearRect(0, 0, el.width, el.height); g.drawImage(panel.canvas, 0, 0); },
+    show(v) {
+      if (v === on) return; on = v;
+      if (v) { el.style.display = 'block'; requestAnimationFrame(() => { el.style.opacity = '1'; }); }
+      else { el.style.opacity = '0'; el.style.display = 'none'; }
+    },
+    rect() { if (!on) return null; const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; },
+    dispose() { el.remove(); },
+  };
 }

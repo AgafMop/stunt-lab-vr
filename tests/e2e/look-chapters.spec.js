@@ -13,7 +13,7 @@ test('look: dummy in the car with the airbag; Roni; the tyre zoom', async ({ pag
     const ctx = window.__ctx, THREE = await import('three');
     const { makeDriver } = await import('/src/chapters/stripKit.js');
     const car = ctx.lab.makeCar(0xf07a1a); car.position.set(-1, 0, -12.5); car.rotation.y = Math.PI / 2; ctx.lab.world.add(car);
-    const d = makeDriver(ctx, 'bumper'); d.position.z = -0.45 + 0.38; d.rotation.x = 0.35; car.add(d);
+    car.add(makeDriver(ctx, 'bumper'));                     // the crash itself: tests/look-gpu/belt.spec.js
     const bag = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 12), new THREE.MeshStandardMaterial({ color: 0xf4f1ea })); bag.position.set(0.38, 0.95, 0.35); bag.scale.setScalar(1.2); car.add(bag);
     const car2 = ctx.lab.makeCar(0xf07a1a); car2.position.set(9, 0, -12.5); car2.rotation.y = Math.PI / 2; ctx.lab.world.add(car2);
     car2.add(makeDriver(ctx, 'roni'));

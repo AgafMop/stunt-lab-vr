@@ -1,9 +1,12 @@
 // A drivable car on the race track: sim (fixed step) + input + view + getting back on the road.
 // Used by the ?fx=drive sandbox and by the race chapter.
+// Keyboard: the eased key steer (driveInput) + keyAlign (keySteer.js) — the car settles parallel to the road when no
+// key is held, so A/D feel like an arcade racer. Controllers (XR) are untouched.
 // Sound: engine, tyre squeal, gravel, barrier thuds (carSound.js; ?mute silences it).
 // Off the road: sand drags the car down, the student can drive back. The game only puts the car back on the road
 // when it is far out (> 22 m), stuck in the sand (no progress for 3 s), or when the student asks (R / B button).
 import { createCar, stepCar, createStepper } from '../game/carSim.js';
+import { keyAlign } from '../game/keySteer.js';
 import { respawn, OFFTRACK_RESPAWN_S } from '../game/track.js';
 import { createDriveInput } from './driveInput.js';
 import { createDriveView } from './driveView.js';
@@ -36,7 +39,8 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
     const near = car.near = track.nearest(car.x, car.z);
     const [w0, w1] = track.def.wet;
     const surface = near.dist > track.def.width / 2 ? 'sand' : near.s >= w0 && near.s <= w1 ? 'wet' : 'dry';
-    const inp = frozen ? PARK : driver ? driver(car, cur, near) : cur;
+    const own = cur.keyboard ? { ...cur, steer: keyAlign(car, track, near, cur.steer) } : cur;   // keyboard: arcade heading hold
+    const inp = frozen ? PARK : driver ? driver(car, own, near) : own;
     lastIn = frozen ? { throttle: cur.throttle, brake: 0 } : inp;           // parked at the lights the gas still revs the engine
     stepCar(car, inp, h, surface);
     car.surface = surface;

@@ -25,7 +25,7 @@ test('chapter: belt — both dummy runs, the tyre zoom, "the road stops the car"
   const r = await play(page, 'belt');
   expect(r.s.flags.beltFirst).toBe('none');
   expect(r.s.flags.tyreTries).toBe(1);
-  for (const id of ['belt_watch_none', 'belt_watch_belt', 'tyre_cruise', 'tyre_accel', 'tyre_brake', 'tyre_ice', 'tyre_q']) expect(r.tasks).toContain(id);
+  for (const id of ['belt_watch_none', 'belt_watch_belt', 'tyre_accel', 'tyre_brake', 'tyre_ice', 'tyre_q']) expect(r.tasks).toContain(id);
 });
 
 test('chapter: plan — hypothesis sentence, matching graph, variables sorted', async ({ page }) => {

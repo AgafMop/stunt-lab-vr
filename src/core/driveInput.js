@@ -1,4 +1,4 @@
-// Driving controls → { throttle, brake, steer, controllers }.
+// Driving controls → { throttle, brake, steer, controllers, keyboard }.
 // XR: right trigger = gas, left trigger = brake; steering = the wheel held with either grip (one or two hands), else the
 // left thumbstick. Desktop: W/↑ gas, S/↓ brake, A/D/←/→ steer (eased). Missing controllers or axes read as zeros.
 import * as THREE from 'three';
@@ -50,6 +50,7 @@ export function createDriveInput(engine, input, { car3d, speed = () => 0 }) {
       const want = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
       keySteer = keySteerStep(keySteer, want, dt, speed());               // eased, gentler at speed (keySteer.js)
       out.steer = keySteer;
+      out.keyboard = true;                                                // driveSession adds keyAlign (arcade heading hold)
     }
     wheelMesh.rotation.set(baseRot.x, baseRot.y, baseRot.z + out.steer * MAX_WHEEL);   // clockwise as the driver sees it
     return out;

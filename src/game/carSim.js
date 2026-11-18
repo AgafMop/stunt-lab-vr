@@ -3,12 +3,13 @@
 //    model.js says (the numbers the student measures).
 //  - createCar/stepCar: the race — an arcade-honest car that drives like the racing games students know:
 //      · the steering wheel turns at a finite rate and asks for a share of the AVAILABLE grip at this speed
-//        (full lock at 90 km/h is a firm limit turn, not a spin; at walking pace it is the real lock),
+//        (full lock at 90 km/h is a firm turn just under the dry limit, never a spin; at walking pace it is the real lock),
 //      · the body has yaw inertia (the turn builds up over ≈ 0.15 s and settles, no snapping),
-//      · grip is a friction circle from the same μ table as the science model: braking hard leaves less for turning,
+//      · grip is a friction circle from the same μ table as the science model: braking hard leaves less for turning
+//        (the gas does not — arcade),
 //        and a corner taken faster than √(μ g R) understeers — the car goes straighter than asked (the wet-corner
 //        lesson), while the body slides a little (slip angle, for tyre smoke and the look),
-//      · gas fades toward top speed (drag), sand drags hard (run-off slows you; you can drive back),
+//      · gas fades toward top speed (drag), sand drags hard (run-off slows you; it grips enough to steer back),
 //      · a full brake decelerates at exactly μ·g — the race brakes like the data.
 // Coordinates: three.js ground plane (x, z). heading 0 = facing +z; forward = (sin h, cos h).
 // steer > 0 = turn right, which (facing +z, seen from above with y up) decreases the heading.
@@ -38,12 +39,16 @@ export const CAR = {
   wheelbase: 2.7,
   maxSteer: 0.55,        // rad, the wheels' full lock at walking pace
   steerRate: 6,          // full-lock fractions per second the wheels can turn (arcade: quick hands)
-  gripAsk: 1.05,         // full lock asks this × the (arcade) dry grip at speed (a little over: the limit is felt, not hidden)
+  gripAsk: 0.9,          // full lock asks this × the (arcade) dry grip at speed: just under the limit — a held turn bites, never
+                         // slides on dry (only braking hard while turning, or the wet / sand, take you past it)
   // SIDEWAYS grip × μ — arcade handling on dry tarmac (like the racing games students know); the wet keeps far less of
   // that bonus so the wet corner stays the lesson. Braking stays exactly μ·g on every surface (the science).
-  arcadeGrip: { dry: 1.7, wet: 1.15, sand: 1, oil: 1 },
+  // sand: the run-off still holds enough sideways to steer back onto the road (it slows you, it does not trap you).
+  arcadeGrip: { dry: 1.9, wet: 1.15, sand: 2, oil: 1 },
   yawLag: 0.07,          // s, the body's yaw response time
   steerCurve: 1.2,       // response curve: small inputs (a key tap, a nudge of the stick) turn a little gentler
+  brakeCircle: 0.6,      // friction circle: a full brake leaves √(1 − this) of the sideways grip
+  gasCircle: 0,          // share of the gas the friction circle charges (arcade: full gas never costs turning grip)
 };
 
 export function createCar({ x = 0, z = 0, heading = 0 } = {}) {
@@ -85,7 +90,8 @@ export function stepCar(car, { throttle = 0, brake = 0, steer = 0, park = false 
 
   // ---- lateral: friction circle (hard braking leaves less grip for turning) ----
   const used = Math.min(1, Math.abs(aLong) / grip);
-  const latMax = (CAR.arcadeGrip[surface] ?? 1) * grip * Math.sqrt(Math.max(0.3, 1 - 0.6 * used * used));
+  const circ = Math.min(1, (aLong * v < 0 ? 1 : CAR.gasCircle) * Math.abs(aLong) / grip);   // share of grip the circle charges
+  const latMax = (CAR.arcadeGrip[surface] ?? 1) * grip * Math.sqrt(Math.max(0.3, 1 - CAR.brakeCircle * circ * circ));
   const sp = Math.abs(car.speed);
   const kAsk = Math.sign(car.steer) * Math.abs(car.steer) ** CAR.steerCurve * lockCurvature(sp);   // > 0 = right; gentle near centre
   let kGet = kAsk;

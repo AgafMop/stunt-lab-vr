@@ -71,9 +71,13 @@ export function sprinkler(ctx) {
 // ---------- drivers in the seat ----------
 export function makeDriver(ctx, kind) {
   if (kind === 'bumper') {
+    // seated in the driver's seat: pelvis on the cushion (y 0.50), back against the seat back, hands at ten to two on
+    // the wheel (CAR_steer, hub (0.38, 0.80, 0.10)), head under the headliner (y ≈ 1.27); the pose and this transform
+    // are solved together in blender/build_bumper.py (GLB model: pos (0.38, 0.232, -0.47), scale 0.92)
     const b = createBumper(ctx.engine, ctx.audio);
-    b.scale.setScalar(0.72); b.position.set(0.38, 0.28, -0.45);
-    b.traverse(o => { if (o.isMesh && o.position.y < 0.3 && o.parent === b.children[0]) o.visible = false; });   // legs inside the footwell
+    const { pos, scale } = b.userData.seat;
+    b.scale.setScalar(scale); b.position.fromArray(pos);
+    b.userData.sit(true);
     return b;
   }
   // Roni: deep-red racing suit, red helmet with a dark mirrored visor (her face is never shown)

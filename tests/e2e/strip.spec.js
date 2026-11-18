@@ -17,7 +17,7 @@ async function playStrip(page, extra = '') {
     return {
       trials: game.s.trials, expected: sampleRun(40, 'dry', makeRng(game.s.seed * 31 + 8)),
       meter: game.s.meter, meterWant: METER.start - 3 * TRIAL_COST, run: stripRun, plan: game.s.plan,
-      flags: game.s.flags, text: ui.textAudit, motion: motionAudit,
+      flags: game.s.flags, text: ui.textAudit, motion: motionAudit, overlap: window.__ctx.boardOverlap || [], card: !!document.getElementById('resultsCard'),
     };
   });
   return { errors, s };
@@ -38,6 +38,7 @@ test('strip: the main experiment — 3 repeats at 40, picked speeds, the sprinkl
   expect(s.flags.sprinkler).toBe(true);
   expect(Math.abs(s.run.frontX - s.expected.distance)).toBeLessThanOrEqual(0.05);
   expect(s.run.read).toBe(s.expected.distance);
+  expect(s.overlap).toEqual([]);                                   // the results card never covers a run
   expect(s.meter).toBe(s.meterWant);
   expect(s.flags.rodeAlong).toBe(false);
   expect(s.text).toEqual([]);

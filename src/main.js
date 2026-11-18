@@ -28,7 +28,7 @@ import * as chRoad from './chapters/ch_road.js';
 import { createIntroVideo, primeIntroVideo } from './lab/introCinema.js';
 import { createGuide } from './ui/guide.js';
 import { createRaceHud } from './ui/raceHud.js';
-import { createBumper } from './world/bumper.js';
+import { createBumper, loadBumperModel } from './world/bumper.js';
 import { enablePcQuality } from './world/pcQuality.js';
 import { DECK_Y } from './world/layout.js';
 
@@ -66,6 +66,15 @@ if (TEST) {
       t.spike = d >= 0.06 && (t.prevD ?? 0) < 0.004 ? d : 0;
       t.prevD = d;
       t.last = (t.last || new THREE.Vector3()).copy(P); t.vis = vis;
+      // the desktop results card must never cover a strip car (on screen, in front of the camera)
+      const r = t.name === 'stripCar' && vis && !dark ? ctx.results?.deskRect?.() : null;
+      if (r) {
+        const q = P.clone(); q.y += 0.7; q.project(engine.camera);
+        const sx = (q.x + 1) / 2 * innerWidth, sy = (1 - q.y) / 2 * innerHeight;
+        if (q.z < 1 && sx > r.x - 30 && sx < r.x + r.w + 30 && sy > r.y - 20 && sy < r.y + r.h + 20) {
+          (ctx.boardOverlap ||= []).push({ chapter: game.s.chapter, sx: Math.round(sx), sy: Math.round(sy) });
+        }
+      }
     }
   });
   window.__ctx = ctx;
@@ -120,6 +129,7 @@ async function boot() {
   }
   // Bumper stands on the tower deck behind-right of the chair (≈118° from straight ahead), turned to the student: the
   // strip spans ≈ −85°…+83° below the eyes, so anywhere further forward he would hide part of it or the cliff end
+  await loadBumperModel({ env: ctx.lab.env });                // assets/bumper.glb (the procedural Bumper if it fails)
   ctx.bumper = createBumper(engine, audio);
   ctx.bumper.position.set(1.5, DECK_Y, -0.6); ctx.bumper.rotation.y = Math.atan2(-1.5, -0.8);
   ctx.lab.tower.add(ctx.bumper);

@@ -3,12 +3,13 @@
 // shape a student produces.
 import { lockCurvature, CAR } from './carSim.js';
 
-export function autopilot(car, track, target, near = track.nearest(car.x, car.z), { look = 1 } = {}) {
+// lane: aim at an offset from the centre line (m, + = the driver's left) — the race's rivals keep their own lines.
+export function autopilot(car, track, target, near = track.nearest(car.x, car.z), { look = 1, lane = 0 } = {}) {
   const { s } = near;
   const v = Math.abs(car.speed);
   const Ld = Math.max(7, v * 0.75) * look;
   const p = track.sample(s + Ld);
-  const want = Math.atan2(p.x - car.x, p.z - car.z);
+  const want = Math.atan2(p.x + p.tz * lane - car.x, p.z - p.tx * lane - car.z);
   const alpha = Math.atan2(Math.sin(want - car.heading), Math.cos(want - car.heading));
   const k = 2 * Math.sin(alpha) / Ld;                                   // > 0 = left
   const x = Math.max(-1, Math.min(1, -k / lockCurvature(v)));

@@ -256,10 +256,15 @@ function numberSign(text, h) {
 }
 
 // the Blender-built car (blender/build_car.py → assets/car.glb), loaded once by loadCarModel(); makeCar() clones it
-let CAR_MODEL = null, SKY_ENV = null;
+// + its far version for the race opponents (blender/build_car_lo.py → assets/car_lo.glb: no interior, ≈ 4 K triangles)
+let CAR_MODEL = null, CAR_LO = null, SKY_ENV = null;
+export const CAR_LOD_DIST = 12;        // m: nearer than this an opponent shows the full car (desktop only)
 export async function loadCarModel() {
-  try { CAR_MODEL = (await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync('assets/car.glb')).scene; }
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  try { CAR_MODEL = (await loader.loadAsync('assets/car.glb')).scene; }
   catch (e) { console.warn('car.glb unavailable, box car', e); }
+  try { CAR_LO = (await loader.loadAsync('assets/car_lo.glb')).scene; }
+  catch (e) { console.warn('car_lo.glb unavailable, opponents use the full car', e); }
 }
 
 /** Car paint (the black racing stripes are their own material in the model: M_stripe). */
@@ -270,10 +275,14 @@ function paintMaterial(color) {
 /** A stunt car. Children: 'seat' (driver eye), 'seatP' (passenger eye), 'wheel' (steering wheel),
  *  'frontWheel' (front axle on the ground — what the student reads on the ruler). Faces +z at rotation.y = 0.
  *  Its wheels roll by the distance it moves (whoever moves it). */
-export function makeCar(color = 0xf07a1a) {
+export function makeCar(color = 0xf07a1a, { lod = false, lo = false } = {}) {
   const car = new THREE.Group(); car.name = 'car';
   if (CAR_MODEL) {
-    const m = CAR_MODEL.clone(true), paint = paintMaterial(color), wheels = [];
+    const paint = paintMaterial(color), wheels = [];
+    // lod: an opponent — THREE.LOD shows the full car near the viewer and the light one beyond CAR_LOD_DIST
+    // lo: always the light car (the table's moving-map models)
+    const m = lo && CAR_LO ? CAR_LO.clone(true) : lod && CAR_LO ? new THREE.LOD() : CAR_MODEL.clone(true);
+    if (m.isLOD) { m.addLevel(CAR_MODEL.clone(true), 0); m.addLevel(CAR_LO.clone(true), CAR_LOD_DIST); }
     m.traverse(o => {
       if (!o.isMesh) return;
       o.castShadow = true;
@@ -283,10 +292,13 @@ export function makeCar(color = 0xf07a1a) {
       if (mn === 'M_lamp' || mn === 'M_tail') o.material.toneMapped = false;
       if (mn === 'M_glass') { o.castShadow = false; o.material.roughness = 0.05; o.material.opacity = 0.3; }
     });
+    // the far car has no interior: darker glass so it never reads as an empty shell
+    const loObj = m.isLOD ? m.levels[1].object : lo && CAR_LO ? m : null;
+    if (loObj) loObj.traverse(o => { if (o.isMesh && o.material.name === 'M_glass') { o.material.opacity = 0.88; o.material.color.set(0x0c1016); } });
     // in the driver's seat the tinted glass would darken the whole view: hidden there (the view is through it anyway)
     const glass = m.getObjectByName('CAR_glass');
     car.userData.setInterior = inside => { if (glass) glass.visible = !inside; };
-    for (const n of ['FL', 'FR', 'RL', 'RR']) { const w = m.getObjectByName(`CAR_wheel_${n}`); if (w) wheels.push(w); }
+    m.traverse(o => { if (/^CAR_wheel_(FL|FR|RL|RR)$/.test(o.name)) wheels.push(o); });   // both levels' wheels roll
     car.add(m); car.userData.built = true;
     // roll the wheels: once per rendered frame, by the distance moved along the car's heading
     const last = new THREE.Vector3(), p = new THREE.Vector3(), fwd = new THREE.Vector3();

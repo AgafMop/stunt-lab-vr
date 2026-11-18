@@ -131,8 +131,10 @@ export function createRaceHud(engine) {
     attachXR(ui, car3d) { dash?.dispose(); dash = dashDisplay(ui, car3d); },
     show(tr) { if (engine.isXR()) return; track = tr; drawBase(); root.hidden = false; $('.finish').classList.remove('on'); },
     hide() { root.hidden = true; dash?.dispose(); dash = null; },
-    update({ t, progress, ghost, length, speed, car, ghostPos }) {
-      if (dash) { const d = ghost - progress; dash.set({ kmh: Math.round(Math.abs(speed) * 3.6), t, gap: Math.abs(d) < 4 ? 'צמוד!' : d > 0 ? `באמפר +⁦${Math.round(d)}⁩ מ׳` : `מובילים ⁦${Math.round(-d)}⁩ מ׳` }); }
+    /** place/of: the student's position in the field; rivals: [{ x, z, heading, color }] for the mini-map. */
+    update({ t, progress, ghost, length, speed, car, ghostPos, place, of, rivals = [] }) {
+      const placeTxt = place ? `מקום ⁦${place}⁩ מתוך ⁦${of}⁩` : null;
+      if (dash) { const d = ghost - progress; dash.set({ kmh: Math.round(Math.abs(speed) * 3.6), t, gap: placeTxt ?? (Math.abs(d) < 4 ? 'צמוד!' : d > 0 ? `באמפר +⁦${Math.round(d)}⁩ מ׳` : `מובילים ⁦${Math.round(-d)}⁩ מ׳`) }); }
       if (root.hidden) return;
       tEl.textContent = fmt(t);
       const kmh = Math.round(Math.abs(speed) * 3.6);
@@ -141,15 +143,16 @@ export function createRaceHud(engine) {
       const p = Math.max(0, Math.min(1, progress / length)), gp = Math.min(1, ghost / length);
       barEl.style.width = `${(p * 100).toFixed(1)}%`; ghostTick.style.left = `calc(${(gp * 100).toFixed(1)}% - 2px)`;
       const d = ghost - progress;
-      gapEl.className = 'gap ' + (d > 0 ? 'behind' : 'ahead');
-      gapEl.textContent = Math.abs(d) < 4 ? 'צמוד לבאמפר!' : d > 0 ? `באמפר לפניכם ב-${Math.round(d)} מ׳` : `אתם מובילים ב-${Math.round(-d)} מ׳`;
+      gapEl.className = 'gap ' + (place ? (place === 1 ? 'ahead' : 'behind') : d > 0 ? 'behind' : 'ahead');
+      gapEl.textContent = placeTxt ?? (Math.abs(d) < 4 ? 'צמוד לבאמפר!' : d > 0 ? `באמפר לפניכם ב-${Math.round(d)} מ׳` : `אתם מובילים ב-${Math.round(-d)} מ׳`);
       g.clearRect(0, 0, cv.width, cv.height); g.drawImage(base, 0, 0);
+      for (const r of rivals) dot(r.x, r.z, r.heading, '#' + r.color.toString(16).padStart(6, '0'), 8);
       if (ghostPos) { const q = track.nearest(ghostPos.x, ghostPos.z); const pp = track.sample(q.s); dot(ghostPos.x, ghostPos.z, Math.atan2(pp.tx, pp.tz), '#3cc4bc', 9); }
       dot(car.x, car.z, car.heading, '#ff8a2a', 11);
     },
-    finish({ time, ghostTime, won }) {
+    finish({ time, ghostTime, won, place, of }) {
       if (root.hidden) return;
-      $('.finish h2').textContent = won ? 'ניצחתם את באמפר!' : 'סיימתם את ההקפה';
+      $('.finish h2').textContent = place ? (place === 1 ? 'ניצחתם במרוץ!' : `סיימתם במקום ${place} מתוך ${of}`) : won ? 'ניצחתם את באמפר!' : 'סיימתם את ההקפה';
       $('.finish .you').innerHTML = `הזמן שלכם: <span class="num">${fmt(time)}</span>`;
       $('.finish .bumper').innerHTML = `באמפר: <span class="num">${fmt(ghostTime)}</span>`;
       $('.finish').classList.add('on');

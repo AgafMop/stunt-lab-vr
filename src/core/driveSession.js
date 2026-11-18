@@ -98,7 +98,9 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
   });
 
   return {
-    car, car3d, view, input, track,
+    car, car3d, view, input, track, walls,
+    /** A knock from another car (m/s across the contact): the same thud as a barrier, at most every 0.4 s. */
+    bump(v) { if (v > 1.5 && performance.now() - lastBump > 400) { lastBump = performance.now(); sound?.bump(v); } },
     start() { running = true; view.update(car, 0); if (!sound && !ctx.params?.has('mute')) sound = createCarSound(ctx.audio); },
     stop() { running = false; sound?.stop(); sound = null; },
     /** Hold the car still (brakes on, no creeping into reverse) — e.g. before the start lights. */
@@ -106,9 +108,10 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
     /** Replace the student's input by a function (car, studentInput, near) → input, or null. */
     setDriver(fn) { driver = fn; },
     onStep(fn) { stepListeners.add(fn); return () => stepListeners.delete(fn); },
-    placeAt(s) {
+    /** Park the car at track position s, offset u (m, + = left: a grid slot). */
+    placeAt(s, u = 0) {
       const p = track.sample(s);
-      Object.assign(car, { x: p.x, z: p.z, heading: Math.atan2(p.tx, p.tz), speed: 0, steer: 0, yawRate: 0, slip: 0, offTrack: 0 });
+      Object.assign(car, { x: p.x + p.tz * u, z: p.z - p.tx * u, heading: Math.atan2(p.tx, p.tz), speed: 0, steer: 0, yawRate: 0, slip: 0, offTrack: 0 });
       car.near = track.nearest(car.x, car.z);
       view.update(car, 0);
     },

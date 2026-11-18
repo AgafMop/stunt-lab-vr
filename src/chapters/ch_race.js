@@ -2,16 +2,17 @@
 //   1. view choice: in the car (cockpit) or remote control from the tower (tabletop model); ?ride=off forces the table
 //   2. start-light drill × START_DRILLS: the student's real simple reaction time; a press before lights-out, or a
 //      trigger already held at lights-out, is a false start and does not count
-//   3. one lap against Bumper's ghost car; rushing the wet corner ends in the sand (inertia + friction teaser)
+//   3. one lap against Bumper and four more drivers — all real cars, solid against each other (raceField.js); rushing the
+//      wet corner ends in the sand (inertia + friction teaser)
 import * as THREE from 'three';
 import { boardAtStation, row } from './kit.js';
 import { createDriveSession } from '../core/driveSession.js';
-import { autopilot } from '../game/autopilot.js';
 import { assistInput } from '../game/assist.js';
 import { classifyStart, makeRng } from '../game/model.js';
 import { START_DRILLS, LIGHTS, GHOST, WET_RUSH } from '../game/config.js';
 import { speedProfile } from '../game/track.js';
 import { reactionDistance } from '../game/model.js';
+import { createField, gridSlot, PLAYER_SLOT } from '../game/raceField.js';
 
 const AUTO_REACTION_MS = 250;
 
@@ -52,8 +53,28 @@ export async function run(ctx, scope) {
     g.visible = false;
   }
   game.s.flags.view = view;
-  drive.placeAt(0);
+  const slot = gridSlot(PLAYER_SLOT);
+  drive.placeAt(slot.s, slot.u);                      // 4th on the grid: slower cars ahead to pass, faster ones behind
   drive.freeze(true);
+  // ---- the field: five rival drivers on the grid, real cars (same physics, barriers, and solid against the student) ----
+  const field = createField(drive.track, drive.walls, { ghostPace: GHOST });
+  const rivals = field.field.map(r => {
+    // headset: always the light car (6 draw calls, 2.7 K triangles — Quest budget); desktop: the full car up close
+    const car3d = scope.add(ctx.lab.makeCar(r.color, engine.isXR() ? { lo: true } : { lod: true })); car3d.name = `rival_${r.id}`;
+    car3d.traverse(o => { if (o.isMesh) o.castShadow = false; });     // the cockpit lap stays inside the triangle budget
+    ctx.lab.world.add(car3d);
+    const mini = scope.add(ctx.lab.makeCar(r.color, { lo: true })); mini.scale.setScalar(ctx.lab.TABLE.carScale); mini.userData.follow = false;
+    ctx.lab.mini.add(mini);
+    return { r, car3d, mini };
+  });
+  const placeRivals = () => { for (const { r, car3d, mini } of rivals) {
+    car3d.position.set(ctx.lab.track3d.position.x + r.car.x, 0, ctx.lab.track3d.position.z + r.car.z); car3d.rotation.y = r.car.heading - (r.car.slip || 0);
+    ctx.lab.placeMini(mini, r.car, false);
+  } };
+  placeRivals();
+  scope.add(engine.onFrame(placeRivals));
+  scope.add(drive.onStep((car, h) => { for (const hit of field.step(h, car)) drive.bump(hit.v); }));
+  ctx.field = field;
   await scope.guard(drive.view.setMode(view));
   drive.start();
 
@@ -146,44 +167,20 @@ export async function run(ctx, scope) {
     g.visible = false;
   }
 
-  // ---- 3. one lap against Bumper ----
+  // ---- 3. one lap against Bumper and the others (the field was on the grid all along) ----
   const track = drive.track;
-  const ghost = ctx.lab.makeCar(0x3cc4bc); ctx.lab.world.add(ghost); scope.add(ghost);
-  ghost.traverse(o => { o.castShadow = false; });                     // keeps the cockpit lap inside the triangle budget
-  const ghostMini = ctx.lab.makeCar(0x3cc4bc); ghostMini.scale.setScalar(ctx.lab.TABLE.carScale); ghostMini.userData.follow = false;
-  ctx.lab.mini.add(ghostMini); scope.add(ghostMini);
-  // Bumper drives a real racing line: brakes before the corners, slows for the wet one (GHOST: a beatable pace)
-  const ghostPace = speedProfile(track, GHOST);
-  let gs = 0, done = false, progress = 0, lastS = 0, armed = false, raceT = 0, ghostT = null;
-  // Bumper's lane: drifts across the road like a driver would, and moves over to pass (never drives through the student)
-  let lane = 2.5;
-  const ghostLane = dt => {
-    const c = drive.car, cs = c.near?.s ?? 0, cp = track.sample(cs);
-    let ds = cs - gs; if (ds > track.length / 2) ds -= track.length; if (ds < -track.length / 2) ds += track.length;
-    const cu = (c.x - cp.x) * cp.tz - (c.z - cp.z) * cp.tx;                // the student's offset (left +)
-    let want = 2.2 * Math.cos(gs / 140);
-    if (Math.abs(ds) < 14) want = cu > 0 ? -3.2 : 3.2;                      // alongside: take the other half of the road
-    lane += (want - lane) * Math.min(1, dt * 1.6);
-    return lane;
-  };
-  let laneNow = lane;
-  const placeGhost = () => {
-    const p = track.sample(gs), q = track.sample(gs + 3), h = Math.atan2(q.x - p.x, q.z - p.z), u = laneNow;
-    ghost.position.set(ctx.lab.track3d.position.x + p.x + p.tz * u, 0, ctx.lab.track3d.position.z + p.z - p.tx * u); ghost.rotation.y = h;
-    ctx.lab.placeMini(ghostMini, { x: p.x + p.tz * u, z: p.z - p.tx * u, heading: h }, false);
-  };
-  placeGhost();
+  const bumper = field.field.find(r => r.id === 'bumper');
+  let done = false, progress = 0, lastS = drive.car.near?.s ?? 0, armed = false, raceT = 0;
   let racing = false;
-  const offGhost = engine.onFrame(dt => {
+  const offHud = engine.onFrame(dt => {
     if (!racing || done) return;
-    const k = dt * (ctx.auto ? ctx.animSpeed : 1);
-    raceT += k;
-    if (gs < track.length) { gs = Math.min(track.length, gs + ghostPace(gs) * k); if (gs >= track.length) ghostT = raceT; }
-    laneNow = ghostLane(k);
-    placeGhost();
-    ctx.raceHud?.update({ t: raceT, progress, ghost: gs, length: track.length, speed: drive.car.speed, car: drive.car, ghostPos: ghost.position });
+    raceT += dt * (ctx.auto ? ctx.animSpeed : 1);
+    const from = field.player.startS;                                    // the HUD measures from the start line
+    ctx.raceHud?.update({ t: raceT, progress: progress + from, ghost: bumper.progress + bumper.startS, length: track.length,
+      speed: drive.car.speed, car: drive.car, place: field.place(progress), of: field.field.length + 1,
+      rivals: field.field.map(r => ({ x: r.car.x, z: r.car.z, heading: r.car.heading, color: r.color })) });
   });
-  scope.add(offGhost);
+  scope.add(offHud);
   const offStep = drive.onStep(car => {
     const { s } = car.near;
     let ds = s - lastS; if (ds < -track.length / 2) ds += track.length; if (ds > track.length / 2) ds -= track.length;
@@ -195,7 +192,7 @@ export async function run(ctx, scope) {
       scope.say('race_wetcorner').catch(() => {});
     }
     if (car.surface === 'dry') armed = false;
-    if (progress >= track.length - 3) done = true;
+    if (progress >= field.playerFinish - 3) done = true;
   });
   scope.add(offStep);
   // steering help (assist.js): the student always steers; 'light' blends in a share of the racing line (headset
@@ -203,9 +200,11 @@ export async function run(ctx, scope) {
   const assist = params.get('assist') ?? (engine.isXR() ? 'light' : 'off');
   game.s.flags.assist = assist;
   const autoPace = speedProfile(track, { margin: 0.7 });
-  if (ctx.auto) drive.setDriver((car, cur, near) => autopilot(car, track, autoPace, near));
+  const autoMe = { car: drive.car, lane: slot.u, paceFn: autoPace };     // ?auto: drives like a rival (passes, never rams)
+  if (ctx.auto) drive.setDriver(() => field.steerFor(autoMe));
   else if (assist !== 'off') drive.setDriver((car, cur, near) => assistInput(car, track, cur, assist, near));
   drive.freeze(false);
+  field.start();
   racing = true;
   ctx.raceHud?.show(track, drive.car);
   if (engine.isXR() && drive.view.mode === 'cockpit') ctx.raceHud?.attachXR(ui, drive.car3d);
@@ -214,7 +213,9 @@ export async function run(ctx, scope) {
   await scope.say('race_go');
   await scope.guard(new Promise(res => { const off = engine.onFrame(() => { if (done) { off(); res(); } }); scope.add(off); }));
   game.s.flags.lapDone = true;
-  game.s.race = { time: raceT, ghostTime: ghostT ?? raceT + (track.length - gs) / 15, won: gs < track.length };
+  const place = field.place(progress), of = field.field.length + 1;
+  const ghostT = bumper.finishT ?? raceT + (field.playerFinish - bumper.progress) / 15;
+  game.s.race = { time: raceT, ghostTime: ghostT, won: bumper.finishT == null || raceT < bumper.finishT, place, of };
   ctx.raceHud?.finish(game.s.race);
   ctx.task?.clear();
   drive.freeze(true);

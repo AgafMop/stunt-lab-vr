@@ -94,3 +94,37 @@ test('race: on desktop the race opens in the chase camera — behind and above t
   expect(Math.abs(r.rx) + Math.abs(r.rz)).toBeLessThan(1e-6);           // the rig never rolls or pitches (the camera pitches)
   await page.screenshot({ path: 'test-results/shots/race-chase.png' });
 });
+
+// The field: five rival drivers on the grid with the student, real cars that never pass through each other.
+test('race: five rivals on the grid, the lap is a race (a place), no car ever inside another', async ({ page }) => {
+  test.setTimeout(360_000);
+  const errors = [];
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('/?test&only=race&auto&fresh&seed=42');
+  await expect(page.locator('#enter')).toBeEnabled({ timeout: 120_000 });
+  await page.click('#enter');
+  await page.waitForFunction(() => window.__ctx?.field, null, { timeout: 60_000 });
+  // every frame: the deepest overlap between any two cars (student + rivals), after the step resolved it
+  await page.evaluate(async () => {
+    const { contact } = await import('/src/game/carCollide.js');
+    const c = window.__ctx; window.__overlap = 0;
+    c.engine.onFrame(() => {
+      if (!c.field || !c.drive) return;
+      const cars = [c.drive.car, ...c.field.field.map(r => r.car)];
+      for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) { const k = contact(cars[i], cars[j]); if (k) window.__overlap = Math.max(window.__overlap, k.depth); }
+    });
+  });
+  const onGrid = await page.evaluate(() => window.__ctx.engine.scene.children.length && ['violet', 'blue', 'bumper', 'yellow', 'red']
+    .every(id => window.__ctx.engine.scene.getObjectByName(`rival_${id}`)));
+  expect(onGrid).toBe(true);
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 330_000 });
+  const r = await page.evaluate(() => ({ race: window.__ctx.game.s.race, overlap: window.__overlap,
+    moved: window.__ctx.field.field.map(f => Math.round(f.progress)) }));
+  expect(errors).toEqual([]);
+  expect(r.race.of).toBe(6);
+  expect(r.race.place).toBeGreaterThanOrEqual(1);
+  expect(r.race.place).toBeLessThanOrEqual(6);
+  for (const m of r.moved) expect(m).toBeGreaterThan(1000);           // every rival really raced
+  expect(r.overlap).toBeLessThan(0.08);
+});

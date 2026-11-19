@@ -1,25 +1,29 @@
-// Chapter 7 — the big shot (spec §6 ch. 7): everything comes together.
-//   Rain machine on: a wet road at 70 km/h. Roni brakes when she sees the red lamp; her reaction time (from the crew's
-//   drills) is 0.7 s. The student places the lamp: reaction distance (3 cards) + braking distance on wet (from THEIR
-//   surface data, 3 cards) = where the lamp goes before the stop line (5 positions).
-//   Roni drives (optional: ride next to her). Within ±2 m of the line: "Cut! Perfect!". Too close to the cliff: over
-//   the edge, the parachute, down into the canyon — and Bumper: "the reaction distance — did we forget it?". Too far
-//   from the line: "this isn't a film, it's parking". Wrong placements cost daylight and try again.
+// Chapter 7 — the big shot (spec §6 ch. 7): everything comes together, and this time the STUDENT drives it.
+//   Rain machine on: a wet road at 70 km/h. The student brakes when the red lamp lights; their reaction time is the one
+//   measured at the start lights in the race. They place the lamp: reaction distance (3 cards, from THEIR reaction
+//   time) + braking distance on wet (from THEIR surface data, 3 cards) = where the lamp goes before the line.
+//   Then they drive it (stripKit.driveToLine: the speed is held, they only brake), Roni in the passenger seat — the
+//   film's "without physics I'm not getting in the car" pays off. Within ±2 m of the line: "Cut! Perfect!".
+//   A miss tells apart a wrong lamp (the calculation) from a press that came early/late (this take's reaction time is
+//   shown next to the race's). Only a wrong lamp costs daylight; the take is repeated until it works.
+//   (Before 2026-11-19 Roni drove and the student only watched — "the film promises stopping on the cliff edge, and
+//   then nothing in the lab asks for it".)
 import * as THREE from 'three';
 import { board } from './kit.js';
-import { mean, reactionDistance, brakingDistance, sampleRun, makeRng } from '../game/model.js';
-import { stripRun, choose, num } from './stripKit.js';
+import { mean, reactionDistance, brakingDistance } from '../game/model.js';
+import { choose, num, driveToLine, LINE_X } from './stripKit.js';
 import { STRIP } from '../world/layout.js';
 import { STUNT, stuntOutcome } from '../game/chapterMath.js';
-export { STUNT, stuntOutcome };
-
-export const LINE_X = STRIP.endX - 3;                      // the painted stop line (x) — the target
+import { lineVerdict } from '../game/cliffDrive.js';
+export { STUNT, stuntOutcome, LINE_X };
 
 export async function run(ctx, scope) {
-  const { game, loco, lab, engine, params } = ctx;
+  const { game, loco, lab, ui } = ctx;
   await loco.goTo('tower');
-  const v = STUNT.kmh, tr = STUNT.tr;
+  const v = STUNT.kmh;
+  const tr = game.s.reaction?.mean ?? 0.3;                     // the student's own, from the race's start lights
   const dr = reactionDistance(v, tr);
+  const vms = v / 3.6;
   const wetData = (game.s.surfaceTrials?.wet || []).filter(t => t.valid).map(t => t.value);
   const dbData = wetData.length ? mean(wetData) : brakingDistance(v, 'wet');
   const dryData = (game.s.surfaceTrials?.dry || []).filter(t => t.valid).map(t => t.value);
@@ -29,14 +33,15 @@ export async function run(ctx, scope) {
   await scope.say('stunt_roni');
 
   const g = board(ctx, scope, 'A_board');
-  // 1. the reaction distance
+  const f2 = n => n.toFixed(2), f1 = n => n.toFixed(1);
+  // 1. the reaction distance, from their own reaction time
   ctx.task?.set('stunt_react');
   await scope.say('stunt_react');
   let hints = 0;
   for (;;) {
     const c = await choose(ctx, scope, g, [
-      ['ok', `⁦19.4⁩ מ׳/ש׳ × ⁦0.7⁩ ש׳ ≈ ⁦${dr.toFixed(1)}⁩ מ׳`], ['kmh', `⁦70⁩ × ⁦0.7⁩ = ⁦49⁩ מ׳`], ['one', `⁦19.4⁩ מ׳ (שנייה שלמה)`],
-    ], 'ok', { w: 0.32, h: 0.11 });
+      ['ok', `⁦${f1(vms)}⁩ מ׳/ש׳ × ⁦${f2(tr)}⁩ ש׳ ≈ ⁦${f1(dr)}⁩ מ׳`], ['kmh', `⁦70⁩ × ⁦${f2(tr)}⁩ = ⁦${f1(70 * tr)}⁩ מ׳`], ['one', `⁦${f1(vms)}⁩ מ׳ (שנייה שלמה)`],
+    ], 'ok', { w: 0.34, h: 0.11 });
     if (c === 'ok') { ctx.audio.sfx('ok'); break; }
     hints++; ctx.audio.sfx('no'); await scope.say(c === 'kmh' ? 'stunt_react_units' : 'stunt_react_time');
   }
@@ -45,47 +50,39 @@ export async function run(ctx, scope) {
   await scope.say('stunt_brake');
   for (;;) {
     const c = await choose(ctx, scope, g, [
-      ['wet', `⁦${dbData.toFixed(1)}⁩ מ׳ (רטוב, מהנתונים שלכם)`], ['dry', `⁦${dbDry.toFixed(1)}⁩ מ׳ (יבש)`], ['half', `⁦${(dbData / 2).toFixed(1)}⁩ מ׳`],
+      ['wet', `⁦${f1(dbData)}⁩ מ׳ (רטוב, מהנתונים שלכם)`], ['dry', `⁦${f1(dbDry)}⁩ מ׳ (יבש)`], ['half', `⁦${f1(dbData / 2)}⁩ מ׳`],
     ], 'wet', { w: 0.34, h: 0.11 });
     if (c === 'wet') { ctx.audio.sfx('ok'); break; }
     hints++; ctx.audio.sfx('no'); await scope.say(c === 'dry' ? 'stunt_brake_dry' : 'stunt_brake_half');
   }
   game.s.flags.stuntHints = hints;
 
-  // 3. place the lamp; Roni drives; until the shot works
-  const total = dr + dbData;
-  const base = Math.round(total);
-  const lamps = [base + 8, base + 4, base, base - 4, base - 13].filter((x, i, a) => a.indexOf(x) === i).sort((a, b) => b - a);
-  let attempts = 0;
+  // 3. place the lamp; drive it; until the shot works
+  const base = Math.round(dr + dbData);
+  const lamps = [base + 8, base + 4, base, base - Math.max(3, Math.round(dr)), base - 13]       // −dr: "forgot the reaction distance"
+    .filter((x, i, a) => x > 0 && a.indexOf(x) === i).sort((a, b) => b - a);
+  let attempts = 0, last = null;
   for (;;) {
     attempts++;
     ctx.task?.set('stunt_lamp');
     scope.say(attempts === 1 ? 'stunt_lamp' : 'stunt_again');
+    if (last) showTake(ctx, scope, g, last, tr);
     const lamp = await choose(ctx, scope, g, lamps.map(x => [x, `⁦${x}⁩ מ׳ לפני הקו`]), base, { w: 0.2, h: 0.11 });
     g.visible = false;
-    let ride = params.get('ride') === 'on';
-    if (attempts === 1 && !params.get('ride')) {
-      const g2 = board(ctx, scope, 'A_board');
-      ctx.task?.set('stunt_ride');
-      scope.say('stunt_ride');
-      ride = await choose(ctx, scope, g2, [[true, 'לשבת ליד רוני'], [false, 'לצפות מהמגדל']], false, { w: 0.3, h: 0.12 });
-      g2.visible = false;
-    }
-    const lampObj = redLamp(); lampObj.position.set(LINE_X - lamp, 0, STRIP.z + STRIP.width / 2 + 0.9); lab.world.add(lampObj); scope.add(lampObj);
     await action(ctx, scope);
-    ctx.task?.set('strip_watch');
-    const rng = makeRng(game.s.seed * 101 + attempts);
-    const brake = sampleRun(v, 'wet', rng).distance;
-    const out = stuntOutcome(lamp, dr, brake);
-    let lit = false;
-    const res = await stripRun(ctx, scope, {
-      kmh: v, brake, react: dr, surface: 'wet', driver: 'roni', rideAlong: ride, cliff: true, zero: LINE_X - lamp,
-      onTick(t, plan) { if (!lit && plan.frontAt(t) >= 0) { lit = true; lampObj.userData.on(true); } },
+    ctx.task?.set('stunt_drive');
+    // the road brakes exactly as their wet data says (no extra noise): a correct lamp + a race-like press = on the line,
+    // so a miss with the right lamp really was the press
+    const res = await driveToLine(ctx, scope, {
+      kmh: v, brake: dbData, surface: 'wet', lamp, passenger: 'roni', color: 0xf07a1a,
+      autoPressAt: ctx.params.get('stuntpress') === 'late' && attempts === 1 ? -lamp + dr + 6 : -lamp + dr,   // ?auto (+?stuntpress=late: take 1 presses late)
+      ready: () => scope.say('stunt_go'),
     });
-    lab.world.remove(res.car);
-    lampObj.removeFromParent();
-    game.s.flags.stuntLast = { lamp, kind: out.kind, miss: Math.round(out.miss * 10) / 10 };
-    if (out.kind === 'ok') {
+    const verdict = lineVerdict(res.stop, res.fell);
+    const lampOk = stuntOutcome(lamp, dr, dbData).kind === 'ok';   // the calculation, with their own numbers
+    last = { lamp, verdict, stop: res.stop, reaction: res.reaction, early: res.early, lampOk };
+    game.s.flags.stuntLast = { lamp, kind: verdict, miss: Math.round(res.stop * 10) / 10, reaction: res.reaction == null ? null : +res.reaction.toFixed(2) };
+    if (verdict === 'ok') {
       ctx.audio.sfx('win');
       if (attempts === 1) game.award('צוק אחד');
       game.s.flags.stuntDone = true; game.s.flags.stuntAttempts = attempts;
@@ -93,31 +90,36 @@ export async function run(ctx, scope) {
       await scope.say('stunt_roni_physics');
       break;
     }
-    game.spend(out.kind === 'cliff' ? 30 : 10);
     ctx.audio.sfx('no');
-    await scope.say(out.kind === 'cliff' ? 'stunt_cliff' : out.kind === 'over' ? 'stunt_over' : 'stunt_short');
+    let line;
+    if (res.early) line = 'stunt_early';
+    else if (lampOk) line = (res.reaction ?? Infinity) > tr ? 'stunt_late' : 'stunt_fast';   // the lamp was right: it was the press
+    else { game.spend(verdict === 'cliff' ? 30 : 10); line = verdict === 'cliff' ? 'stunt_cliff' : verdict === 'over' ? 'stunt_over' : 'stunt_short'; }
+    await scope.say(line);
     g.visible = true;
   }
   ctx.task?.clear();
-  void engine; void THREE;
+}
+
+/** The last take, in numbers, above the lamp cards: where it stopped and this take's reaction vs the race's. */
+function showTake(ctx, scope, g, t, tr) {
+  const { ui } = ctx;
+  g.getObjectByName('stuntTake')?.removeFromParent();
+  const f = n => `⁦${Math.abs(n).toFixed(1)}⁩`;
+  const where = t.verdict === 'cliff' ? 'הטייק הקודם: לקניון' : t.stop > 0 ? `הטייק הקודם: ${f(t.stop)} מ׳ אחרי הקו` : `הטייק הקודם: ${f(t.stop)} מ׳ לפני הקו`;
+  const react = t.early ? 'בלמתם לפני שהפנס נדלק' : t.reaction == null ? 'לא בלמתם' : `זמן התגובה בטייק: ⁦${t.reaction.toFixed(2)}⁩ ש׳ (במרוץ: ⁦${tr.toFixed(2)}⁩ ש׳)`;
+  const p = scope.add(ui.panel({ w: 0.8, h: 0.17, name: 'stuntTake', viewDist: 2.6, draw(c, W, H) {
+    ui.rr(c, 4, 4, W - 8, H - 8, 22); c.fillStyle = ui.C.bg; c.fill(); c.lineWidth = 4; c.strokeStyle = '#FFB347'; c.stroke();
+    const mp = ui.minPx(900, 2.6);
+    c.fillStyle = ui.C.ink; ui.fitText(c, where, { x: 24, y: 8, w: W - 48, h: H * 0.46, maxPx: H * 0.36, minPx: mp, font: ui.FONT, weight: 800 });
+    c.fillStyle = '#9FB0C8'; ui.fitText(c, react, { x: 24, y: H * 0.52, w: W - 48, h: H * 0.4, maxPx: H * 0.28, minPx: mp, font: ui.FONT, weight: 600 });
+  } }));
+  p.mesh.name = 'stuntTake'; p.mesh.position.set(0, 0.17, 0); g.add(p.mesh);
 }
 
 async function action(ctx, scope) {
   const { action: act } = await import('./stripKit.js');
   return act(ctx, scope, 'stunt_action');
-}
-
-/** The red signal lamp on a post beside the strip; on(true) lights it. */
-function redLamp() {
-  const g = new THREE.Group(); g.name = 'redLamp';
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 10), new THREE.MeshStandardMaterial({ color: 0x222222 })); post.position.y = 0.8; g.add(post);
-  const housing = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.3), new THREE.MeshStandardMaterial({ color: 0x111111 })); housing.position.y = 1.8; g.add(housing);
-  const bulbMat = new THREE.MeshBasicMaterial({ color: 0x401010, toneMapped: false });
-  const bulb = new THREE.Mesh(new THREE.CircleGeometry(0.14, 20), bulbMat); bulb.position.set(0, 1.8, -0.16); bulb.rotation.y = Math.PI; g.add(bulb);
-  const bulb2 = bulb.clone(); bulb2.position.z = 0.16; bulb2.rotation.y = 0; g.add(bulb2);
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: 0, toneMapped: false, depthWrite: false })); glow.position.y = 1.8; g.add(glow);
-  g.userData.on = v => { bulbMat.color.setHex(v ? 0xff2a2a : 0x401010); glow.material.opacity = v ? 0.35 : 0; };
-  return g;
 }
 
 /** Rain from the rain machine over the strip (thin streaks around it). */

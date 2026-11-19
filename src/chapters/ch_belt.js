@@ -113,7 +113,7 @@ function tyreZoom(ctx) {
     ui.rr(c, 4, 4, W - 8, H - 8, 22); c.fillStyle = 'rgba(10,14,22,0.92)'; c.fill(); c.lineWidth = 4; c.strokeStyle = '#FFB347'; c.stroke();
     c.fillStyle = '#FFB347'; ui.fitText(c, text, { x: 20, y: 8, w: W - 40, h: H - 16, maxPx: H * 0.55, minPx: ui.minPx(900, 2.2), font: ui.FONT, weight: 800 });
   } });
-  caption.mesh.position.set(0, 0.62, 0); g.add(caption.mesh);
+  caption.mesh.position.set(0, -R - 0.37, 0.36); g.add(caption.mesh);   // under the legend: the sky above the wheel is the subtitles' band
   const legend = ui.panel({ w: 1.7, h: 0.13, ppm: 900, viewDist: 2.2, name: 'tyreLegend', draw(c, W, H, items = []) {
     c.font = `600 ${Math.round(H * 0.42)}px ${ui.FONT}`; c.textBaseline = 'middle'; c.textAlign = 'right';
     let x = W - 10;
@@ -143,7 +143,7 @@ function tyreZoom(ctx) {
   });
   g.lookAt(0, 6 + 1.17, -1.4); g.rotation.x = 0; g.rotation.z = 0;
   let asideT = 0;
-  const offAside = engine.onFrame(dt => { if (asideT > 0 && asideT < 1) { asideT = Math.min(1, asideT + dt * 2.5); const e = asideT * asideT * (3 - 2 * asideT); g.position.x = -1.15 * e; g.scale.setScalar(1 - 0.3 * e); } });
+  const offAside = engine.onFrame(dt => { if (asideT > 0 && asideT < 1) { asideT = Math.min(1, asideT + dt * 2.5); const e = asideT * asideT * (3 - 2 * asideT); g.position.x = 1.15 * e; g.scale.setScalar(1 - 0.3 * e); } });   // aside to the RIGHT: the task card lives up-left
   g.userData = { phase: show, aside() { asideT = 0.001; }, dispose() { off(); offAside(); caption.dispose(); legend.dispose(); } };
   return g;
 }

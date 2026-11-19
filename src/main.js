@@ -17,6 +17,7 @@ import { createDriveSession } from './core/driveSession.js';
 import { makeRng, cleanRuns } from './game/model.js';
 import * as chEnd from './chapters/ch_end.js';
 import * as chRace from './chapters/ch_race.js';
+import * as chCliff from './chapters/ch_cliff.js';
 import * as chStrip from './chapters/ch_strip.js';
 import * as chIntro from './chapters/ch_intro.js';
 import * as chBelt from './chapters/ch_belt.js';
@@ -32,8 +33,8 @@ import { createBumper, loadBumperModel } from './world/bumper.js';
 import { enablePcQuality } from './world/pcQuality.js';
 import { DECK_Y } from './world/layout.js';
 
-const CH = { intro: chIntro, race: chRace, belt: chBelt, plan: chPlan, strip: chStrip, graph: chGraph, surfaces: chSurfaces, stunt: chStunt, road: chRoad, end: chEnd };
-const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', belt: 'למה חגורה?', plan: 'תכנון המחקר', strip: 'הניסוי המרכזי', graph: 'הגרף והגילוי', surfaces: 'המשטחים', stunt: 'הצילום הגדול', road: 'מהסט לכביש', end: 'סיכום' };
+const CH = { intro: chIntro, race: chRace, cliff: chCliff, belt: chBelt, plan: chPlan, strip: chStrip, graph: chGraph, surfaces: chSurfaces, stunt: chStunt, road: chRoad, end: chEnd };
+const CH_NAMES = { intro: 'פתיחה', race: 'מבחן הקבלה', cliff: 'מבחן הצוק', belt: 'למה חגורה?', plan: 'תכנון המחקר', strip: 'הניסוי המרכזי', graph: 'הגרף והגילוי', surfaces: 'המשטחים', stunt: 'הצילום הגדול', road: 'מהסט לכביש', end: 'סיכום' };
 
 const params = new URLSearchParams(location.search);
 const TEST = params.has('test');
@@ -75,6 +76,50 @@ if (TEST) {
           (ctx.boardOverlap ||= []).push({ chapter: game.s.chapter, sx: Math.round(sx), sy: Math.round(sy) });
         }
       }
+    }
+  });
+  // UI overlap audit: no two text panels may cover each other in what the eye (XR: the headset's eye) sees. Every 0.3 s:
+  // each visible panel → its screen rectangle; a pair overlapping by > 4 % of the smaller one is logged once per chapter.
+  // A panel lying on a bigger panel of the same group (a card on its board's backing) is part of that board, not a clash.
+  ctx.uiOverlaps = []; const seenOv = new Set(); let ovT = 0;
+  const corner = new THREE.Vector3();
+  const rectOf = (m, cam) => {
+    const { width: w, height: h } = m.geometry.parameters; let x0 = 1, x1 = -1, y0 = 1, y1 = -1;
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      corner.set(sx * w / 2, sy * h / 2, 0).applyMatrix4(m.matrixWorld).applyMatrix4(cam.matrixWorldInverse);
+      if (corner.z > -0.05) return null;                                        // behind the eye
+      corner.applyMatrix4(cam.projectionMatrix);
+      x0 = Math.min(x0, corner.x); x1 = Math.max(x1, corner.x); y0 = Math.min(y0, corner.y); y1 = Math.max(y1, corner.y);
+    }
+    const r = { x0: Math.max(-1, x0), x1: Math.min(1, x1), y0: Math.max(-1, y0), y1: Math.min(1, y1) };
+    return r.x1 > r.x0 && r.y1 > r.y0 ? r : null;
+  };
+  const shownChain = o => { let p = o; for (; p.parent; p = p.parent) if (!p.visible) return false; return p.visible && p === engine.scene; };
+  const area = r => (r.x1 - r.x0) * (r.y1 - r.y0);
+  const ancestor = (a, b) => { for (let p = b.parent; p; p = p.parent) if (p === a) return true; return false; };
+  engine.onAfterRender(() => {
+    const now = performance.now(); if (now - ovT < 300) return; ovT = now;
+    const cam = engine.isXR() ? (engine.renderer.xr.getCamera().cameras?.[0] ?? engine.camera) : engine.camera;
+    const list = [];
+    for (const m of ui.panels) {
+      const hiddenOk = m.userData.auditHidden && engine.isXR() && m.parent && (m.parent === engine.scene || shownChain(m.parent));
+      if (!hiddenOk && (!shownChain(m) || m.material.opacity < 0.05)) continue;
+      m.updateWorldMatrix(true, false);
+      const r = rectOf(m, cam); if (r) list.push({ m, r });
+    }
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const A = list[i], B = list[j];
+      if (ancestor(A.m, B.m) || ancestor(B.m, A.m)) continue;
+      const ix = Math.min(A.r.x1, B.r.x1) - Math.max(A.r.x0, B.r.x0), iy = Math.min(A.r.y1, B.r.y1) - Math.max(A.r.y0, B.r.y0);
+      if (ix <= 0 || iy <= 0) continue;
+      const small = Math.min(area(A.r), area(B.r)), frac = ix * iy / small;
+      if (frac < 0.04) continue;
+      const [big, sm] = area(A.r) >= area(B.r) ? [A, B] : [B, A];
+      if (frac > 0.98 && big.m.parent === sm.m.parent && sm.m.position.z > big.m.position.z) continue;   // on its backing
+      const names = [A.m.userData.panel, B.m.userData.panel].sort();
+      const key = `${game.s.chapter}|${names.join('|')}`;
+      if (seenOv.has(key)) continue; seenOv.add(key);
+      ctx.uiOverlaps.push({ chapter: game.s.chapter, task: ctx.taskLog?.at(-1) ?? null, film: ctx.introPhase === 'video', a: names[0], b: names[1], frac: +frac.toFixed(2), xr: engine.isXR() });
     }
   });
   window.__ctx = ctx;
@@ -215,6 +260,7 @@ function skipFill(id) {
     game.s.reaction.mean ??= game.s.reaction.simple.reduce((a, b) => a + b, 0) / game.s.reaction.simple.length;
     game.s.flags.lapDone = true;
   }
+  if (id === 'cliff') game.s.cliffTest ??= { verdict: 'skipped' };
   if (id === 'belt') { game.s.flags.beltFirst ??= 'belt'; game.s.flags.tyreTries ??= 1; }
   if (id === 'plan') game.s.hypothesis ??= { pred: 'x2', graph: 'line' };
   if (id === 'strip') {

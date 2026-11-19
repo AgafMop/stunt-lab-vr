@@ -66,6 +66,11 @@ export function createDriveInput(engine, input, { car3d, speed = () => 0 }) {
       if (!engine.renderer.xr.getSession?.()) return false;
       return input.pointers.some(p => p.source?.gamepad && !p.source.hand && (p.handedness === 'left' || p.handedness === 'right'));
     },
+    /** Y on the left controller held (skip the lap; xr-standard buttons[5]). Desktop: never (a screen button does it). */
+    skipHeld() {
+      if (!engine.renderer.xr.getSession?.()) return false;
+      return input.pointers.some(p => p.handedness === 'left' && p.source?.gamepad?.buttons?.[5]?.pressed);
+    },
     /** Gas pressed right now (start lights): right trigger, W/↑ or Space. */
     gasHeld() {
       const session = engine.renderer.xr.getSession?.();

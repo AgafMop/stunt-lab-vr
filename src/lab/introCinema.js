@@ -44,15 +44,16 @@ export async function playIntroCinema(ctx, scope, video, { loadTimeout = 15000, 
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.8), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, fog: false }));
   const frame = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 1.9), new THREE.MeshBasicMaterial({ color: 0x1a0f0a, toneMapped: false, fog: false }));
   frame.position.z = -0.01; cinema.add(frame, screen);
+  screen.userData.panel = 'filmScreen'; ui.panels?.add(screen);       // ?test overlap audit: nothing may cover the film
   let skip = null, offCue = () => {}, offVis = () => {};
   const restore = () => {
     offCue(); offVis();
     try { el.pause(); } catch { /* gone */ }
     if (skip) { ctx.input.unregister(skip.mesh); skip.dispose(); skip = null; }
-    scene.remove(cinema); screen.geometry.dispose(); frame.geometry.dispose(); screen.material.dispose(); frame.material.dispose(); tex.dispose();
+    ui.panels?.delete(screen); scene.remove(cinema); screen.geometry.dispose(); frame.geometry.dispose(); screen.material.dispose(); frame.material.dispose(); tex.dispose();
     scene.background = bg; scene.fog = fog;
     hidden.forEach(o => { o.visible = true; });
-    ui.subtitles.hide();
+    ui.subtitles.hide(); ui.subtitles.dock(null);
     video.inUse = false;
     ctx.introPhase = 'done';
   };
@@ -69,6 +70,8 @@ export async function playIntroCinema(ctx, scope, video, { loadTimeout = 15000, 
       cinema.position.copy(head).addScaledVector(engine.camera.getWorldDirection(new THREE.Vector3()), 3.0);
       cinema.lookAt(head);
     }
+    // the subtitles sit under the picture (scaled to the 3 m screen), never over it; the skip button below them
+    ui.subtitles.dock(cinema, [0, -1.32, 0.03], 2.1);
     ctx.introPhase = 'video';
     video.inUse = true;
     el.currentTime = 0; el.volume = 1; el.playbackRate = rate;
@@ -96,7 +99,7 @@ export async function playIntroCinema(ctx, scope, video, { loadTimeout = 15000, 
     const skipped = new Promise(res => setTimeout(() => {
       if (el.ended || scope.aborted) return;
       skip = ui.button3d('דילוג על הפתיחה', () => res('skipped'), { w: 0.9, h: 0.17, viewDist: 3 });
-      skip.mesh.name = 'skipIntro'; skip.mesh.position.set(0, -1.2, 0.02); cinema.add(skip.mesh);
+      skip.mesh.name = 'skipIntro'; skip.mesh.position.set(0, -2.0, 0.02); cinema.add(skip.mesh);
     }, skipAfterMs / rate));
     result = await scope.guard(Promise.race([ended, skipped]));
     await engine.fade(1, 500);

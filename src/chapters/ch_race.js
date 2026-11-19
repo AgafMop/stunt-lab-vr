@@ -122,6 +122,7 @@ export async function run(ctx, scope) {
   drillOn = false; lights.visible = false;
   if (hudL) setTimeout(() => hudL.show(false), 1800);                     // the three times stay a moment, then the card explains them
 
+  let skipLap = false;
   // ---- 2b. what the reaction time MEANS (spec §6: d_r = v · t_r) — it is used again on the strip and in the stunt ----
   const tr = game.s.reaction.mean = game.s.reaction.simple.reduce((a, b) => a + b, 0) / game.s.reaction.simple.length;
   const blind = reactionDistance(50, tr);
@@ -138,15 +139,34 @@ export async function run(ctx, scope) {
       c.fillStyle = '#9FB0C8'; ui.fitText(c, 'זה "מרחק התגובה". בכביש אמיתי, כשלא יודעים מתי משהו יקרה, זמן התגובה ארוך פי 3–4.', { x: 30, y: H * 0.64, w: W - 60, h: H * 0.18, maxPx: H * 0.065, minPx: mp, font: F, weight: 500 });
     } }));
     g.add(card.mesh);
-    const ok = scope.add(ui.button3d('הבנתי! להקפה', () => {}, { w: 0.34, h: 0.09, viewDist: 1.05 }));
-    ok.mesh.position.set(0, -0.29, 0.01); g.add(ok.mesh);
+    // race the lap, or skip it (the 2026-11-19 headset check: "an option to skip the race for whoever is not interested");
+    // the reaction times above are kept either way — the stunt needs them
+    let pick;
+    const picked = new Promise(res => { pick = res; });
+    const ok = scope.add(ui.button3d('הבנתי! למרוץ', () => pick('race'), { w: 0.3, h: 0.09, viewDist: 1.05 }));
+    const skip = scope.add(ui.button3d('דלגו על המרוץ', () => pick('skip'), { style: 'alt', w: 0.3, h: 0.09, viewDist: 1.05 }));
+    ok.mesh.position.set(0.17, -0.29, 0.01); skip.mesh.position.set(-0.17, -0.29, 0.01); g.add(ok.mesh, skip.mesh);
+    ok.mesh.name = 'raceGo'; skip.mesh.name = 'raceSkip';
     ctx.task?.set('race_reaction');
-    ctx.input.setRaysOnHit?.(false);                                  // a button to click: the rays are back
+    ctx.input.setRaysOnHit?.(false);                                  // buttons to click: the rays are back
     await scope.say('race_reaction1');
     await scope.say('race_reaction2');
-    await scope.waitSelect(ok.mesh);
+    const glows = [ok.mesh, skip.mesh].map(m => ctx.attention?.(m) ?? (() => {}));
+    scope.add(() => glows.forEach(f => f()));
+    if (ctx.auto) setTimeout(() => ctx.input.select(params.get('lap') === 'skip' ? skip.mesh : ok.mesh), 300);
+    skipLap = await scope.guard(picked) === 'skip';
+    glows.forEach(f => f());
+    ctx.audio.sfx('click');
     ctx.input.setRaysOnHit?.(drive.view.mode === 'cockpit');
     g.visible = false;
+  }
+  if (skipLap) {
+    game.s.flags.lapSkipped = true;
+    game.s.race = { skipped: true };
+    drive.freeze(true);
+    await scope.say('race_skip');
+    await leaveCar(ctx, drive, engine);
+    return;
   }
 
   // ---- 3. one lap against Bumper and the others (the field was on the grid all along) ----
@@ -193,17 +213,44 @@ export async function run(ctx, scope) {
   if (engine.isXR() && drive.view.mode === 'cockpit') ctx.raceHud?.attachXR(ui, drive.car3d);
   scope.add(() => ctx.raceHud?.hide());
   ctx.task?.set('race_lap');
-  await scope.say('race_go');
-  await scope.guard(new Promise(res => { const off = engine.onFrame(() => { if (done) { off(); res(); } }); scope.add(off); }));
+  // skip mid-lap: hold Y (left controller) for a second in the headset, or the button on the desktop screen
+  let quit = false, yHeld = 0;
+  const offQuit = engine.onFrame(dt => {
+    if (done || quit) return;
+    if (drive.input.skipHeld?.()) { if ((yHeld += dt) > 1) quit = true; } else yHeld = 0;
+  });
+  scope.add(offQuit);
+  if (!engine.isXR()) {
+    const b = document.createElement('button');
+    b.className = 'btn alt'; b.type = 'button'; b.id = 'raceSkipBtn'; b.textContent = 'דלגו על המרוץ ⏭';
+    b.style.cssText = 'position:fixed;left:18px;top:122px;z-index:7;font-size:15px;padding:7px 14px';
+    b.addEventListener('click', e => { e.stopPropagation(); b.blur(); quit = true; });
+    document.body.append(b); scope.add(() => b.remove());
+  }
+  scope.say('race_go').catch(() => {});
+  await scope.guard(new Promise(res => { const off = engine.onFrame(() => { if (done || quit) { off(); res(); } }); scope.add(off); }));
+  ctx.task?.clear();
+  drive.freeze(true);
+  drive.setDriver(null);
+  if (quit && !done) {
+    game.s.flags.lapSkipped = true;
+    game.s.race = { skipped: true };
+    ctx.audio.stop?.();
+    await scope.say('race_skip');
+    await leaveCar(ctx, drive, engine);
+    return;
+  }
   game.s.flags.lapDone = true;
   const place = field.place(progress), of = field.field.length + 1;
   const ghostT = bumper.finishT ?? raceT + (field.playerFinish - bumper.progress) / 15;
   game.s.race = { time: raceT, ghostTime: ghostT, won: bumper.finishT == null || raceT < bumper.finishT, place, of };
   ctx.raceHud?.finish(game.s.race);
-  ctx.task?.clear();
-  drive.freeze(true);
-  drive.setDriver(null);
   await scope.say('race_done');
+  await leaveCar(ctx, drive, engine);
+}
+
+/** Out of the race car, back to the tower chair (faded). */
+async function leaveCar(ctx, drive, engine) {
   await engine.fade(1, 250);
   drive.stop();
   drive.view.dispose?.();

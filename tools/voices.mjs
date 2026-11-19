@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { LINES } from '../src/game/script.js';
+import { LINES, spoken } from '../src/game/script.js';
 
 const env = readFileSync(`${homedir()}/.claude/skills/speech-generator/scripts/.env`, 'utf8');
 const KEYS = [...env.matchAll(/^ELEVENLABS_API_KEY\w*=(.+)$/gm)].map(m => m[1].trim().replace(/^["']|["']$/g, ''));
@@ -61,7 +61,7 @@ function similarity(a, b) {
 
 async function make(id, l) {
   const raw = `${OUT}/${id}.raw.mp3`, out = `${OUT}/${id}.mp3`;
-  writeFileSync(raw, await tts(`${TAG[l.speaker] ?? ''} ${l.say ?? l.text}`, VOICE[l.speaker]));
+  writeFileSync(raw, await tts(`${TAG[l.speaker] ?? ''} ${spoken(l)}`, VOICE[l.speaker]));   // PRON: niqqud on the words it gets wrong
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', raw, '-af', `${FILTER[l.speaker] ?? 'anull'},${LEVEL}`, '-ac', '1', '-b:a', '64k', out]);
   unlinkSync(raw);
   return out;

@@ -7,6 +7,7 @@
 //   clapper()     the film clapper prop
 import * as THREE from 'three';
 import { planStripRun } from '../game/stripPlan.js';
+import { createCliffDrive, CLIFF } from '../game/cliffDrive.js';
 import { STRIP, RIM_X } from '../world/layout.js';
 import { row, board } from './kit.js';
 import { createBumper } from '../world/bumper.js';
@@ -106,6 +107,17 @@ function parachute() {
   return g;
 }
 
+/** One frame of a car falling off the lip: a short free fall, the chute opens, it drifts down. True when done. */
+function stepFall(fall, dt, car, chute) {
+  fall.t += dt;
+  const open = fall.t > 0.7;
+  fall.vy -= (open ? 2.0 : 9.8) * dt; if (open) { fall.vy = Math.max(fall.vy, -3.2); fall.vx *= Math.exp(-1.2 * dt); }
+  fall.x += fall.vx * dt; fall.y += fall.vy * dt;
+  car.position.set(fall.x, fall.y, STRIP.z); car.rotation.z = open ? Math.sin(fall.t * 1.3) * 0.08 : -Math.min(0.5, fall.t * 0.9);
+  if (open) chute.scale.setScalar(Math.min(1, chute.scale.x + dt * 1.8));
+  return fall.t > 4.5;
+}
+
 /**
  * One scripted run. kmh: gate speed; brake: braking metres; react: metres at full speed after the gate (signal) before
  * braking; surface: what the layer shows ('sprinkler' = the accident: the sprinkler sprays as the car arrives);
@@ -137,7 +149,8 @@ export async function stripRun(ctx, scope, { kmh, brake, react = 0, surface = 'd
     await engine.fade(1, 200);
     loco.lock(true); loco.setPitch(-0.08);
     loco.follow(() => ({ pos: seatP.getWorldPosition(eye), yaw: car.rotation.y + Math.PI }));
-    scope.add(() => { if (loco.following) { loco.follow(null); loco.goTo('tower', { fade: false }); } loco.lock(false); });
+    ctx.rideCar = car; ctx.rideSeat = 'seatP';                       // the guide docks the subtitles on its windshield
+    scope.add(() => { ctx.rideCar = null; if (loco.following) { loco.follow(null); loco.goTo('tower', { fade: false }); } loco.lock(false); });
     await engine.fade(0, 250);
   }
   let fell = false;
@@ -155,14 +168,9 @@ export async function stripRun(ctx, scope, { kmh, brake, react = 0, surface = 'd
       }
       if (plan.over && t >= plan.over.t) {                         // over the edge: fly, chute, drift down
         if (!fall) { fall = { t: 0, x: car.position.x, y: 0, vx: plan.over.speed, vy: 0 }; fell = true; car.add(chute); ctx.audio.sfx?.('whoosh'); }
-        fall.t += dt * speedK;
-        const open = fall.t > 0.7;
-        fall.vy -= (open ? 2.0 : 9.8) * dt * speedK; if (open) { fall.vy = Math.max(fall.vy, -3.2); fall.vx *= Math.exp(-1.2 * dt * speedK); }
-        fall.x += fall.vx * dt * speedK; fall.y += fall.vy * dt * speedK;
-        car.position.set(fall.x, fall.y, STRIP.z); car.rotation.z = open ? Math.sin(fall.t * 1.3) * 0.08 : -Math.min(0.5, fall.t * 0.9);
-        if (open) chute.scale.setScalar(Math.min(1, chute.scale.x + dt * speedK * 1.8));
+        const ended = stepFall(fall, dt * speedK, car, chute);
         loco.applyFollow();
-        if (fall.t > 4.5) { off(); res(); }
+        if (ended) { off(); res(); }
         return;
       }
       setFront(plan.frontAt(t));
@@ -187,6 +195,157 @@ export async function stripRun(ctx, scope, { kmh, brake, react = 0, surface = 'd
   }
   loco.lock(false);
   return { car, stop: fell ? null : plan.stop, fell, plan };
+}
+
+// ---------- the student drives to the line (cliffDrive.js) ----------
+export const LINE_X = STRIP.endX - 3;                      // the painted stop line before the cliff (world x)
+
+/** Brake pressed now: any trigger in the headset; S / ↓ / Space or the mouse on the desktop. */
+function brakeInput(ctx) {
+  const keys = new Set(); let mouse = false;
+  const kd = e => keys.add(e.code), ku = e => keys.delete(e.code);
+  const md = () => { mouse = true; }, mu = () => { mouse = false; };
+  const el = ctx.engine.renderer.domElement;
+  addEventListener('keydown', kd); addEventListener('keyup', ku); el.addEventListener('pointerdown', md); addEventListener('pointerup', mu);
+  return {
+    down() {
+      if (ctx.engine.renderer.xr.getSession?.()) return ctx.input.pointers.some(p => (p.source?.gamepad?.buttons?.[0]?.value ?? 0) > 0.5);
+      return mouse || keys.has('KeyS') || keys.has('ArrowDown') || keys.has('Space');
+    },
+    dispose() { removeEventListener('keydown', kd); removeEventListener('keyup', ku); el.removeEventListener('pointerdown', md); removeEventListener('pointerup', mu); },
+  };
+}
+
+/**
+ * The student in the driver's seat of the strip car: it speeds up to `kmh` by itself and holds it; one press of the
+ * brake stops it with the road's deceleration (`brake` m from `kmh`). lamp: metres before the line where the red lamp
+ * lights as the front passes it (the big shot); passenger: 'roni' beside the student. Over the lip: a fade, and the
+ * fall (chute) is watched from the tower. ?auto presses at the front position `autoPressAt`. ready(): awaited once
+ * seated, before the car moves.
+ * Resolves { stop (m past the line), fell, brakeX, reaction (s from the lamp to the press), early }.
+ */
+export async function driveToLine(ctx, scope, { kmh = 70, brake, surface = 'dry', lamp = null, passenger = null, autoPressAt = null, color = 0x2a7de1, ready = null }) {
+  const { engine, lab, loco } = ctx;
+  const k = ctx.auto ? ctx.animSpeed : 1;
+  const runup = (kmh / 3.6) ** 2 / (2 * CLIFF.accel);
+  const d = createCliffDrive({ kmh, brake, start: -runup - (lamp != null ? Math.max(60, lamp + 18) : 60) });
+  const s = d.state;
+  const take = [];                                              // this take's objects: gone when it ends (retries start clean)
+  const own = o => { scope.add(o); take.push(o); return o; };
+  const car = own(lab.makeCar(color));
+  car.rotation.y = Math.PI / 2;                                    // heading +x along the strip, toward the cliff
+  const setFront = m => car.position.set(LINE_X + m - FRONT, 0, STRIP.z);
+  setFront(s.x); lab.world.add(car);
+  ctx.track?.(car, 'stripCar');
+  if (passenger) { const p = makeDriver(ctx, passenger); p.position.x = -0.38; car.add(p); scope.add(() => p.userData.dispose?.()); }
+  const layer = surfaceLayer(surface); if (layer) { lab.world.add(layer); own(layer); }
+  // the line, readable from the driver's seat (a 0.45 m stripe is a hair at 40 m): a signal gantry standing ON it, posts
+  // at both road edges; its big red light is the signal in the big shot — straight ahead, where the driver looks.
+  // The roadside post at `lamp` m only marks where the signal fires (when the front passes it; the old lamp lit there,
+  // ≈ 70° to the side of the driver = outside the headset's view).
+  const gantry = own(lineGantry()); lab.world.add(gantry);
+  let lampObj = null, lampT = null;
+  if (lamp != null) { lampObj = own(redLamp()); lampObj.position.set(LINE_X - lamp, 0, STRIP.z + STRIP.width / 2 + 0.9); lab.world.add(lampObj); }
+  const signal = on => { gantry.userData.on(on); lampObj?.userData.on(on); };
+  const brk = brakeInput(ctx); scope.add(() => brk.dispose());
+  ctx.cliffState = s;                                           // tests read the live run
+
+  // into the driver's seat
+  const seat = car.getObjectByName('seat'), eye = new THREE.Vector3();
+  await engine.fade(1, 200);
+  loco.lock(true); loco.setPitch(-0.05);
+  loco.follow(() => ({ pos: seat.getWorldPosition(eye), yaw: car.rotation.y + Math.PI }));
+  ctx.rideCar = car; ctx.rideSeat = 'seat';                    // the guide: task card on its dash, subtitles on its glass
+  scope.add(() => { ctx.rideCar = null; if (loco.following) { loco.follow(null); loco.goTo('tower', { fade: false }); } loco.lock(false); });
+  const leave = async () => {
+    await engine.fade(1, 220);
+    loco.follow(null); ctx.rideCar = null;
+    await loco.goTo('tower', { fade: false });
+    loco.lock(false);
+    await engine.fade(0, 300);
+  };
+  loco.applyFollow();
+  await engine.fade(0, 250);
+  await scope.wait(500);
+  if (ready) await ready();                                      // seated: the last instruction before the car moves
+
+  // drive: the first press after the start (a trigger already held must be let go first) latches full braking
+  let released = !brk.down(), stopT = null;
+  await scope.guard(new Promise(res => {
+    const off = engine.onFrame(dt => {
+      const now = brk.down();
+      if (!now) released = true;
+      let left = Math.min(dt, 0.1) * k;
+      while (left > 1e-6 && s.phase !== 'stopped' && s.phase !== 'over') {
+        const h = Math.min(left, 1 / 120); left -= h;
+        const press = ctx.auto ? autoPressAt != null && s.x >= autoPressAt : now && released;
+        d.step(h, press);
+        if (lampObj && lampT == null && s.x >= -lamp) { lampT = s.t; signal(true); ctx.cliffLit = true; }
+      }
+      setFront(s.x);
+      loco.applyFollow();
+      if (s.phase === 'over') { off(); res(); }
+      if (s.phase === 'stopped') { stopT ??= performance.now(); if (performance.now() - stopT > 900 / k) { off(); res(); } }
+    });
+    scope.add(off);
+  }));
+  const fell = s.phase === 'over';
+  const out = { stop: s.x, fell, brakeX: s.brakeX, reaction: lampT != null && s.brakeT != null && s.brakeT >= lampT ? (s.brakeT - lampT) : null,           // sim seconds (= real ones unless ?auto)
+    early: lamp != null && s.brakeT != null && (lampT == null || s.brakeT < lampT) };
+  if (fell) {
+    // first-person over the edge is no fun in a headset: cut to the tower at the lip and watch the car go
+    const lipX = car.position.x, v = s.overSpeed;
+    await leave();
+    const chute = parachute(); car.add(chute);
+    ctx.audio.sfx?.('whoosh');
+    const fall = { t: 0, x: lipX, y: 0, vx: v, vy: 0 };
+    await scope.guard(new Promise(res => {
+      const off = engine.onFrame(dt => { if (stepFall(fall, Math.min(dt, 0.1) * k, car, chute)) { off(); res(); } });
+      scope.add(off);
+    }));
+  } else {
+    ctx.audio.sfx('ok');
+    await leave();
+  }
+  signal(false);
+  for (const o of take) o.removeFromParent();
+  ctx.cliffState = null; ctx.cliffLit = false;
+  return out;
+}
+
+/** A gantry standing on the stop line: red-and-white posts at both road edges, a beam, a big red signal facing the
+ *  driver (on(true) lights it). */
+function lineGantry() {
+  const g = new THREE.Group(); g.name = 'lineGantry';
+  const red = new THREE.MeshStandardMaterial({ color: 0xd22a1e, roughness: 0.6 }), white = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.6 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.7 });
+  const H = 4.6, half = STRIP.width / 2 + 0.5;
+  for (const side of [-1, 1]) for (let i = 0; i < 6; i++) {
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, H / 6, 10), i % 2 ? white : red);
+    seg.position.set(0, H / 12 + i * H / 6, side * half); g.add(seg);
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 2 * half), dark); beam.position.y = H; g.add(beam);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.9, 0.9), dark); box.position.y = H - 0.55; g.add(box);
+  const bulbMat = new THREE.MeshBasicMaterial({ color: 0x3a0e0e, toneMapped: false });
+  const bulb = new THREE.Mesh(new THREE.CircleGeometry(0.36, 24), bulbMat); bulb.position.set(-0.18, H - 0.55, 0); bulb.rotation.y = -Math.PI / 2; g.add(bulb);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(1.0, 14, 10), new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: 0, toneMapped: false, depthWrite: false }));
+  glow.position.set(-0.3, H - 0.55, 0); g.add(glow);
+  g.position.set(LINE_X, 0, STRIP.z);
+  g.userData.on = v => { bulbMat.color.setHex(v ? 0xff2a2a : 0x3a0e0e); glow.material.opacity = v ? 0.4 : 0; };
+  return g;
+}
+
+/** The red signal lamp on a post beside the strip; on(true) lights it. */
+export function redLamp() {
+  const g = new THREE.Group(); g.name = 'redLamp';
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.6, 10), new THREE.MeshStandardMaterial({ color: 0x222222 })); post.position.y = 0.8; g.add(post);
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.3), new THREE.MeshStandardMaterial({ color: 0x111111 })); housing.position.y = 1.8; g.add(housing);
+  const bulbMat = new THREE.MeshBasicMaterial({ color: 0x401010, toneMapped: false });
+  const bulb = new THREE.Mesh(new THREE.CircleGeometry(0.14, 20), bulbMat); bulb.position.set(0, 1.8, -0.16); bulb.rotation.y = Math.PI; g.add(bulb);
+  const bulb2 = bulb.clone(); bulb2.position.z = 0.16; bulb2.rotation.y = 0; g.add(bulb2);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: 0, toneMapped: false, depthWrite: false })); glow.position.y = 1.8; g.add(glow);
+  g.userData.on = v => { bulbMat.color.setHex(v ? 0xff2a2a : 0x401010); glow.material.opacity = v ? 0.35 : 0; };
+  return g;
 }
 
 // ---------- choosing and reading ----------

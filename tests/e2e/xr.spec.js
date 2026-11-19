@@ -132,6 +132,42 @@ test('xr: full game in the headset — every task in view', async ({ page }) => 
   expect(await page.evaluate(() => window.__gameDone)).toBe(true);
 });
 
+// Round 4 (2026-11-19, third headset check): the student drives to the cliff line. The REAL input path (no ?auto): a
+// trigger already held when the car starts does not brake; letting go and pressing does. Eye screenshots ≈ 40 m out
+// (is the line findable?). Holding Y is the lap's skip.
+test('xr: cliff test — a held trigger does not brake, a fresh press does; the line is visible from the seat', async ({ page }) => {
+  test.setTimeout(400_000);
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await headset(page, { eyeY: 1.2 });
+  await page.goto('/?test&fresh&seed=42&only=cliff');
+  await page.click('#enterVR');
+  await page.waitForFunction(() => window.__ctx?.engine.isXR());
+  await page.evaluate(() => window.__xrd.controllers.right.setButtonValueImmediate('trigger', 1));   // held from the start
+  await page.waitForFunction(() => window.__ctx.cliffState?.v > 15, null, { timeout: 300_000 });
+  expect(await page.evaluate(() => window.__ctx.cliffState.brakeX)).toBeNull();
+  await page.evaluate(() => window.__xrd.controllers.right.setButtonValueImmediate('trigger', 0));
+  await page.waitForFunction(() => window.__ctx.cliffState?.x > -42, null, { timeout: 300_000 });
+  await page.screenshot({ path: `${SHOTS}/cliff-40m.png` });
+  await page.evaluate(() => window.__xrd.controllers.right.setButtonValueImmediate('trigger', 1));
+  await page.waitForFunction(() => { const s = window.__ctx.cliffState; return !s || s.brakeX != null; }, null, { timeout: 60_000 });
+  const s = await page.evaluate(() => window.__ctx.cliffState && { brakeX: window.__ctx.cliffState.brakeX, phase: window.__ctx.cliffState.phase });
+  console.log(JSON.stringify(s));
+  expect(s.brakeX).toBeGreaterThan(-45);
+  expect(s.brakeX).toBeLessThan(0);
+  expect(errors).toEqual([]);
+});
+
+test('xr: holding Y on the left controller is the lap skip', async ({ page }) => {
+  await headset(page, { eyeY: 1.2 });
+  await page.goto('/?test&fresh&fx=drive');
+  await page.click('#enterVR');
+  await page.waitForFunction(() => window.__ctx?.drive?.view?.mode === 'cockpit' && window.__ctx.engine.isXR(), null, { timeout: 60_000 });
+  expect(await page.evaluate(() => window.__ctx.drive.input.skipHeld())).toBe(false);
+  await page.evaluate(() => window.__xrd.controllers.left.setButtonValueImmediate('y-button', 1));
+  await page.waitForFunction(() => window.__ctx.drive.input.skipHeld(), null, { timeout: 20_000 });
+});
+
 // The 2026-11-19 headset check: "my hands should sit on the wheel and turn it — that does not happen". The controllers
 // ARE the wheel now: tilt the line between them. Real (emulated) controller poses, no ?auto, no setDriver.
 const hold = (page, deg, { cy = 1.0, z = -0.35 } = {}) => page.evaluate(([deg, cy, z]) => {

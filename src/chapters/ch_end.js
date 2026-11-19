@@ -13,7 +13,7 @@ export async function run(ctx, scope) {
     s.hypothesis ? `ההשערה שלכם ${f.hypothesisSupported ? 'אוששה' : 'לא אוששה'}. ככה מתקדם המדע.` : null,
     'כביש רטוב: עוצרים רחוק בהרבה. מרחק עצירה = מרחק תגובה + מרחק בלימה.',
   ].filter(Boolean);
-  const g = boardAtStation(ctx, scope, 'tower', { dist: 1.1, height: 1.3 });
+  const g = boardAtStation(ctx, scope, 'tower', { dist: 1.1, height: 1.08 });   // a tall board: its top stays under the subtitles' band (21° up)
   const p = scope.add(ui.panel({ w: 0.86, h: 0.62, name: 'end', viewDist: 1.1, draw(c, W, H) {
     ui.rr(c, 6, 6, W - 12, H - 12, 30); c.fillStyle = ui.C.bg; c.fill(); c.lineWidth = 6; c.strokeStyle = ui.C.oxy; c.stroke();
     const mp = ui.minPx(900, 1.1);

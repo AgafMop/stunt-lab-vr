@@ -30,7 +30,7 @@ export function wrapText(g, text, x, y, maxW, lh) {
 export const minPx = (ppm, viewDist = 0.8) => Math.ceil(0.0175 * viewDist / 0.72 * ppm);
 
 export function createUI(engine, input, { audit = false } = {}) {
-  const textAudit = [], seen = new Set();
+  const textAudit = [], seen = new Set(), panels = new Set();
   // fitText that also reports a box it could not fit at the minimum size (audit only)
   function fitText(g, text, opts) {
     const r = fitRaw(g, text, opts);
@@ -80,10 +80,12 @@ export function createUI(engine, input, { audit = false } = {}) {
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest, toneMapped: false }));
+    mesh.userData.panel = name;
+    if (audit) panels.add(mesh);                                       // ?test: the overlap audit (main.js) checks every panel
     const p = {
       mesh, canvas: c, g, W: c.width, H: c.height,
       redraw(...args) { g.clearRect(0, 0, c.width, c.height); g.direction = 'rtl'; draw?.(g, c.width, c.height, ...args); tex.needsUpdate = true; },
-      dispose() { mesh.parent?.remove(mesh); tex.dispose(); mesh.geometry.dispose(); mesh.material.dispose(); input.unregister(mesh); },
+      dispose() { panels.delete(mesh); mesh.parent?.remove(mesh); tex.dispose(); mesh.geometry.dispose(); mesh.material.dispose(); input.unregister(mesh); },
     };
     p.redraw(); fontsReady.then(() => p.redraw());
     return p;
@@ -148,7 +150,13 @@ export function createUI(engine, input, { audit = false } = {}) {
     if (!mesh.parent) scene.add(mesh);
   }
 
-  // ---- subtitles: DOM on desktop, lerp-followed panel in XR ----
+  // ---- subtitles: DOM on desktop; in XR a fixed ZONE, never over the boards, cards and task card (2026-11-19 headset
+  // check: "text boxes cover each other in many places" — the old panel rode 12° below the gaze, over every board):
+  //   free (the tower): a band 21° above the horizon, over the boards (they open at and below eye level, the notebook's
+  //     top ≈ 11°) in the sky; it turns with the head only when the head turns > 45° away, and then stays above the
+  //     task card (5° up, 40° left: its top ≈ 11°, the band's bottom ≈ 16°)
+  //   docked: a place on an object — the car (upper windshield, over the road, clear of the dash, the HUD, the task card
+  //     and the start lights) or the film screen (under the picture)
   const subEl = document.getElementById('sub');
   const subPanel = panel({ w: 1.1, h: 0.27, ppm: 800, depthTest: false, viewDist: 1.6, name: 'subtitles', draw(g, W, H, speaker, text) {
     if (!text) return;
@@ -158,17 +166,33 @@ export function createUI(engine, input, { audit = false } = {}) {
     g.fillStyle = C.ink; fitText(g, text, { x: 34, y: 66, w: W - 68, h: H - 80, maxPx: 44, minPx: minPx(800, 1.6), weight: 500, align: 'right', valign: 'top', font: FONT });
   } });
   subPanel.mesh.renderOrder = 9000; subPanel.mesh.visible = false; subPanel.mesh.userData.ui = true; scene.add(subPanel.mesh);
-  let subTimer = 0;
-  const target = new THREE.Vector3(), q = new THREE.Quaternion();
+  subPanel.mesh.userData.auditHidden = true;                          // the audit counts it even between lines: any line may show here
+  const SUB = { dist: 1.4, pitch: 21 * Math.PI / 180, freeScale: 0.9, carPitch: 26 * Math.PI / 180, follow: 45 * Math.PI / 180 };
+  let subTimer = 0, dock = null, snap = true, subYaw = 0, turning = false;
+  const target = new THREE.Vector3(), q = new THREE.Quaternion(), head = new THREE.Vector3(), fwd = new THREE.Vector3();
   engine.onFrame(dt => {
     if (subTimer > 0 && (subTimer -= dt) <= 0) { subPanel.mesh.visible = false; if (subEl) subEl.hidden = true; }
-    if (!engine.isXR() || !subPanel.mesh.visible) return;
-    const cam = camera;
-    const head = cam.getWorldPosition(target.clone());
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(q));
-    target.copy(head).addScaledVector(fwd, 1.4); target.y = head.y - 0.3;          // a little below the gaze, always in view
-    subPanel.mesh.position.lerp(target, Math.min(1, dt * 5));
-    subPanel.mesh.lookAt(head);
+    if (!engine.isXR() || (!subPanel.mesh.visible && !audit)) return;     // ?test: kept placed while hidden (the overlap audit)
+    const m = subPanel.mesh, cam = camera;
+    cam.getWorldPosition(head);
+    if (dock) {
+      if (m.parent !== dock.obj) dock.obj.add(m);
+      m.position.copy(dock.pos); m.scale.setScalar(dock.scale); m.lookAt(head);
+      snap = true;
+      return;
+    }
+    if (m.parent !== scene) { scene.add(m); snap = true; }
+    m.scale.setScalar(SUB.freeScale);                                    // ±19° wide: clear of the side boards
+    fwd.set(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(q));
+    const want = Math.atan2(-fwd.x, -fwd.z);
+    if (snap) { subYaw = want; turning = false; }
+    let dy = want - subYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+    if (Math.abs(dy) > SUB.follow) turning = true;
+    if (turning) { subYaw += dy * Math.min(1, dt * 3); if (Math.abs(dy) < 0.05) turning = false; }
+    const r = SUB.dist * Math.cos(SUB.pitch);
+    target.set(head.x - Math.sin(subYaw) * r, head.y + SUB.dist * Math.sin(SUB.pitch), head.z - Math.cos(subYaw) * r);
+    if (snap) { m.position.copy(target); snap = false; } else m.position.lerp(target, Math.min(1, dt * 6));
+    m.lookAt(head);
   });
   const subtitles = {
     show(speaker, text, ms = 3000) {
@@ -183,6 +207,15 @@ export function createUI(engine, input, { audit = false } = {}) {
       }
     },
     hide() { subTimer = 0.0001; },
+    /** Put the subtitles on `obj` at local `pos` (a Vector3 or [x,y,z]), `scale` × the normal size; dock(null) = free zone. */
+    dock(obj, pos, scale = 1) { dock = obj ? { obj, pos: new THREE.Vector3().fromArray(pos.toArray ? pos.toArray() : pos), scale } : null; snap = true; },
+    /** Dock in a car: upper windshield, straight ahead of `seat` (the eye object in the car), 1.4 m away, 26° up. */
+    dockCar(car, seat) {
+      const s = seat.position;
+      subtitles.dock(car, [s.x, s.y + SUB.dist * Math.sin(SUB.carPitch), s.z + SUB.dist * Math.cos(SUB.carPitch)]);
+    },
+    get docked() { return dock?.obj ?? null; },
+    mesh: subPanel.mesh,
   };
 
   // ---- resource meter ("lives": oxygen, time, battery...): DOM HUD on desktop, a watch on the left controller in XR ----
@@ -213,5 +246,5 @@ export function createUI(engine, input, { audit = false } = {}) {
     return { update };
   }
 
-  return { panel, card, button3d, inFront, subtitles, wristMeter, C, FONT, rr, wrapText, fitText, minPx, fontsReady, textAudit };
+  return { panel, card, button3d, inFront, subtitles, wristMeter, C, FONT, rr, wrapText, fitText, minPx, fontsReady, textAudit, panels };
 }

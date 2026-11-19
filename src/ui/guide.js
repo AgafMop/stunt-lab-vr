@@ -70,7 +70,7 @@ export function createGuide(ctx) {
   // ≈ 40° left of the seated student's straight-ahead, ≈ 10° above the eyes, 1.25 m: it covers only sky (the strip, the
   // number signs and the far track are below the horizon) and stays clear of the boards that open straight ahead —
   // they span up to ≈ 25° left (at 30° it covered the view-choice card in the headset, 2026-11-18). Faces the chair.
-  towerHome.position.set(-0.79, 6 + 1.39, -2.34);
+  towerHome.position.set(-0.79, 6 + 1.28, -2.34);              // 5° up (2026-11-19: its top stays under the subtitles' 21° band)
   ctx.lab.root.add(towerHome);
   towerHome.lookAt(0, 6 + 1.17, -1.4);
   // on the face of the dashboard, right of the steering wheel, BELOW the driver's line of sight over the dash (every corner of the
@@ -83,10 +83,23 @@ export function createGuide(ctx) {
     const riding = ctx.loco?.following;
     const car = ctx.drive?.car3d;
     if (riding && car && ctx.drive.view?.mode === 'cockpit') return car;
+    if (riding && ctx.rideCar && ctx.rideSeat === 'seat') return ctx.rideCar;      // driving the strip car to the line
     if (riding) return null;                                            // riding along on the strip: just watch
     return towerHome;
   }
+  // where the subtitles live (ui3d SUB zones): in a car the student sits in → that car's windshield; the film docks them
+  // itself (introCinema); anywhere else the free band under the boards
+  let subCar = null;
+  function subtitleZone() {
+    if (ctx.introPhase === 'video') return;
+    const car = ctx.loco?.following ? (ctx.drive?.view?.mode === 'cockpit' ? ctx.drive.car3d : ctx.rideCar) : null;
+    if (car === subCar && (car ? ui.subtitles.docked === car : !ui.subtitles.docked)) return;
+    subCar = car;
+    if (car) ui.subtitles.dockCar(car, car.getObjectByName(ctx.drive?.car3d === car ? 'seat' : (ctx.rideSeat || 'seatP')));
+    else ui.subtitles.dock(null);
+  }
   engine.onFrame(() => {
+    subtitleZone();
     const h = isXR() ? home() : null;
     if (h !== panel.mesh.parent) {
       panel.mesh.removeFromParent();
@@ -107,7 +120,7 @@ export function createGuide(ctx) {
     /** Set the current task by id (TASKS in script.js); null hides it. */
     set(id) {
       const t = id ? TASKS[id] : null;
-      text = t?.text || ''; hint = t?.drive ? driveHint(true) : ''; domHint = t?.drive ? driveHint(isXR()) : '';
+      text = t?.text || ''; hint = t?.drive ? driveHint(true, t.skip) : ''; domHint = t?.drive ? driveHint(isXR(), t.skip) : '';
       panel.redraw();
       if (dom) { dom.replaceChildren(); if (text) { const b = document.createElement('b'); b.textContent = 'המשימה עכשיו'; const p = document.createElement('div'); p.textContent = text; dom.append(b, p); if (domHint) { const s = document.createElement('small'); s.textContent = domHint; dom.append(s); } } }
       if (id) ctx.taskLog?.push(id);
@@ -120,8 +133,8 @@ export function createGuide(ctx) {
 }
 
 /** The driving controls, as a hint line for the task card. */
-export function driveHint(xr) {
+export function driveHint(xr, skip = false) {
   return xr
-    ? 'הדק ימני: גז · שמאלי: בלם · היגוי: שתי הידיים כמו הגה · B: לכביש'
+    ? `הדק ימני: גז · שמאלי: בלם · היגוי: שתי הידיים כמו הגה · B: לכביש${skip ? ' · Y ארוך: דילוג' : ''}`
     : 'W: גז · S: בלם / רוורס · A / D: היגוי · V: מצלמה · R: לכביש';
 }

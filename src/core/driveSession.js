@@ -20,7 +20,7 @@ const PARK = { throttle: 0, brake: 1, steer: 0, park: true };
 export const FAR_OFF = 22;
 
 /** timeScale/maxSub: ?auto self-play runs the sim faster (more fixed steps per frame), never coarser. */
-export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub = 30 } = {}) {
+export function createDriveSession(ctx, { timeScale = 1, maxSub = 30 } = {}) {
   const { engine, lab } = ctx;
   const track = lab.track;
   const car3d = lab.makeCar(0xf07a1a);
@@ -29,7 +29,7 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
   const car = createCar({ x: st.x, z: st.z, heading: Math.atan2(st.tx, st.tz) });
   car.near = track.nearest(car.x, car.z); car.surface = 'dry';
   const input = createDriveInput(engine, ctx.input, { car3d, speed: () => car.speed });
-  const view = createDriveView(ctx, { car3d, forced });
+  const view = createDriveView(ctx, { car3d });
   const walls = buildBarriers(track, TRACK_ORIGIN);
   let lastBump = 0, sound = null, lastIn = ZERO;
   let running = false, frozen = false, respawning = false, cur = ZERO, driver = null, stuck = 0, resetAsked = false;
@@ -39,7 +39,7 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
     const near = car.near = track.nearest(car.x, car.z);
     const [w0, w1] = track.def.wet;
     const surface = near.dist > track.def.width / 2 ? 'sand' : near.s >= w0 && near.s <= w1 ? 'wet' : 'dry';
-    const own = cur.keyboard ? { ...cur, steer: keyAlign(car, track, near, cur.steer) } : cur;   // keyboard: arcade heading hold
+    const own = cur.align ? { ...cur, steer: keyAlign(car, track, near, cur.steer) } : cur;   // arcade heading hold (keys + headset)
     const inp = frozen ? PARK : driver ? driver(car, own, near) : own;
     lastIn = frozen ? { throttle: cur.throttle, brake: 0 } : inp;           // parked at the lights the gas still revs the engine
     stepCar(car, inp, h, surface);
@@ -85,12 +85,12 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
   };
   addEventListener('keydown', onKey);
   let xLatch = false, bLatch = false;
-  const offX = engine.onFrame(() => {                 // XR: left X toggles the view, right B puts the car back on the road
+  const offX = engine.onFrame(() => {                 // XR: right B puts the car back on the road (left X: next view, if any)
     if (!running) return;
     const left = ctx.input.pointers.find(p => p.handedness === 'left');
     const right = ctx.input.pointers.find(p => p.handedness === 'right');
     const down = !!left?.source?.gamepad?.buttons?.[4]?.pressed;
-    if (down && !xLatch) view.toggle();
+    if (down && !xLatch && view.modes().length > 1) view.toggle();
     xLatch = down;
     const b = !!right?.source?.gamepad?.buttons?.[5]?.pressed;
     if (b && !bLatch && !frozen) resetAsked = true;
@@ -99,6 +99,8 @@ export function createDriveSession(ctx, { forced = false, timeScale = 1, maxSub 
 
   return {
     car, car3d, view, input, track, walls,
+    /** The student's steering input right now (−1..1, + = right), also while parked. */
+    get steerIn() { return cur.steer; },
     /** A knock from another car (m/s across the contact): the same thud as a barrier, at most every 0.4 s. */
     bump(v) { if (v > 1.5 && performance.now() - lastBump > 400) { lastBump = performance.now(); sound?.bump(v); } },
     start() { running = true; view.update(car, 0); if (!sound && !ctx.params?.has('mute')) sound = createCarSound(ctx.audio); },

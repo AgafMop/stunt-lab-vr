@@ -46,6 +46,7 @@ export function createInput(engine) {
 
   // ---- XR controllers ----
   const pointers = [];
+  let raysOnHit = false;
   const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
   for (let i = 0; i < 2; i++) {
     const ctrl = renderer.xr.getController(i);
@@ -146,6 +147,7 @@ export function createInput(engine) {
         if (obj !== p.hover) { if (p.hover) setHover(p.hover, false); if (obj) { setHover(obj, true); pulse(p); } p.hover = obj; }
         p.line.scale.z = hit ? hit.distance : 3;
         if (hit) { p.dot.visible = true; p.dot.position.copy(hit.point); }
+        else if (raysOnHit) p.line.visible = false;               // driving: no laser out of the hands on the wheel
       }
     } else {
       ray.setFromCamera(mouse.ndc, camera);
@@ -172,6 +174,8 @@ export function createInput(engine) {
       for (const p of [...pointers, mouse]) if (p.hover === obj) p.hover = null;
     },
     setEnabled(v) { enabled = v; },
+    /** true: an XR ray shows only while it points at something to click (driving: the hands hold the wheel). */
+    setRaysOnHit(v) { raysOnHit = v; },
     setTargetEnabled(obj, v) { const h = handlers.get(obj); if (h) h.enabled = v; },
     /** Desktop drag holder for grabbable props: { holder, begin(), move(ray) } or null. */
     setDragHolder(d) { drag = d; },

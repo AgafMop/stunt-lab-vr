@@ -4,9 +4,8 @@
 //             the headset (a camera that moves on its own makes people sick there).
 //   cockpit — the student sits in the driver's seat; the rig follows the seat with YAW ONLY (no roll/pitch ever),
 //             a soft vignette eases in on fast turns / hard acceleration (headset).
-//   table   — the student stays in the tower chair; a moving map of the circuit on the table, heading-up, the car fixed
-//             in the middle pointing away from the student: zero camera motion (headset comfort option).
-// Switching fades out/in. ?ride=off locks the table view (teacher's choice for the class).
+// Switching fades out/in. (The tower's remote-control table view was removed after the 2026-11-19 headset check:
+// "driving from above is bizarre". The headset drives from the driver's seat only.)
 import * as THREE from 'three';
 import { TRACK_ORIGIN } from '../lab/stuntScene.js';
 import { createVignette } from '../fx/vignette.js';
@@ -14,16 +13,14 @@ import { createVignette } from '../fx/vignette.js';
 export const CHASE = { back: 7.2, up: 2.6, ahead: 6, lookUp: 0.9, lag: 0.28, fov: [68, 80] };
 
 /** The modes this device offers, in toggle order. */
-export function viewModes(engine, forced) {
-  if (forced) return ['table'];
-  return engine.isXR() ? ['cockpit', 'table'] : ['chase', 'cockpit'];
+export function viewModes(engine) {
+  return engine.isXR() ? ['cockpit'] : ['chase', 'cockpit'];
 }
 
-export function createDriveView(ctx, { car3d, forced = false }) {
+export function createDriveView(ctx, { car3d }) {
   const { engine, lab, loco } = ctx;
   const seat = car3d.getObjectByName('seat');
   const frame = car3d.userData.built ? new THREE.Group() : cockpitFrame(); car3d.add(frame);   // the Blender car has a real dash + pillars
-  const mini = lab.makeCar(); mini.scale.setScalar(lab.TABLE?.carScale ?? 2.2); lab.mini.add(mini);
   const vignette = createVignette(engine);
   const eye = new THREE.Vector3(), cam = new THREE.Vector3(), look = new THREE.Vector3();
   const baseFov = engine.camera.fov;
@@ -46,27 +43,21 @@ export function createDriveView(ctx, { car3d, forced = false }) {
 
   const view = {
     get mode() { return mode; },
-    forced,
-    modes: () => viewModes(engine, forced),
+    modes: () => viewModes(engine),
     async setMode(m) {
-      if (busy || m === mode || (forced && mode)) return;
+      if (busy || m === mode || !view.modes().includes(m)) return;
       busy = true;
       if (mode) await engine.fade(1, 180);
       engine.camera.fov = baseFov; engine.camera.updateProjectionMatrix();
-      if (m === 'cockpit' || m === 'chase') {
+      {
         loco.lock(true);
-        lab.world.visible = true; lab.table.visible = false;
         frame.visible = m === 'cockpit';
+        const hands = car3d.getObjectByName('driverHands'); if (hands) hands.visible = m === 'cockpit';
+        ctx.input?.setRaysOnHit?.(m === 'cockpit');
         car3d.userData.setInterior?.(m === 'cockpit');
         if (m === 'cockpit') { loco.setPitch(-0.08); loco.follow(() => ({ pos: seat.getWorldPosition(eye), yaw: car3d.rotation.y + Math.PI })); }
         else { camYaw = null; camPos = null; chase = chasePose(0); loco.follow(() => chase); }   // the pose is advanced once per frame in update()
         if (m === 'chase') vignette.set(0);
-      } else {
-        loco.follow(null);
-        await loco.goTo('tower', { fade: false });
-        loco.lock(true);
-        lab.world.visible = false; lab.table.visible = true; frame.visible = false;
-        vignette.set(0);
       }
       mode = m;
       if (ctx.audio?.sfx) ctx.audio.sfx('click');
@@ -78,7 +69,6 @@ export function createDriveView(ctx, { car3d, forced = false }) {
     update(car, dt) {
       car3d.position.set(TRACK_ORIGIN.x + car.x, 0, TRACK_ORIGIN.z + car.z);
       car3d.rotation.y = car.heading - (car.slip || 0);                        // the body slides a little past the limit
-      lab.placeMini?.(mini, car);
       if (mode === 'cockpit' && dt > 0) {
         const yawRate = prevHeading == null ? 0 : Math.abs(car.heading - prevHeading) / dt;
         const accel = Math.abs(car.speed - prevSpeed) / dt;
@@ -94,10 +84,9 @@ export function createDriveView(ctx, { car3d, forced = false }) {
       loco.applyFollow();
     },
     dispose() {
-      loco.follow(null); loco.lock(false);
+      loco.follow(null); loco.lock(false); ctx.input?.setRaysOnHit?.(false);
       engine.camera.fov = baseFov; engine.camera.updateProjectionMatrix();
-      lab.world.visible = true; lab.table.visible = false;
-      car3d.remove(frame); lab.mini.remove(mini); vignette.dispose();
+      car3d.remove(frame); vignette.dispose();
       lab.focusShadow?.(25, -12);
     },
   };

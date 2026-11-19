@@ -36,16 +36,16 @@ test('race: choice, three valid starts, lap completes', async ({ page }) => {
 
 test('race: a held trigger at lights-out is a false start and does not count', async ({ page }) => {
   test.setTimeout(200_000);
-  const { errors, s } = await playRace(page, '&forcefalse&ride=off');
-  expect(s.flags.view).toBe('table');
+  const { errors, s } = await playRace(page, '&forcefalse&ride=on');
+  expect(s.flags.view).toBe('cockpit');
   expect(s.reaction.falseStarts).toBe(1);
   expect(s.reaction.simple).toHaveLength(3);
   expect(errors).toEqual([]);
 });
 
 // look at the start lights in both views (screenshots to READ, not just assertions)
-for (const ride of ['on', 'off']) {
-  test(`race: start lights screenshot (${ride === 'on' ? 'cockpit' : 'table'})`, async ({ page }) => {
+for (const ride of ['on', 'chase']) {
+  test(`race: start lights screenshot (${ride === 'on' ? 'cockpit' : 'chase'})`, async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto(`/?test&only=race&auto&fresh&seed=42&animspeed=1&ride=${ride}`);
     await expect(page.locator('#enter')).toBeEnabled({ timeout: 100_000 });
@@ -54,7 +54,7 @@ for (const ride of ['on', 'off']) {
       const l = window.__ctx?.engine.scene.getObjectByName('startLights');
       return l && l.children.filter(c => c.material?.color?.r > 0.9).length >= 3;
     }, null, { timeout: 100_000 });
-    await page.screenshot({ path: `test-results/shots/lights-${ride === 'on' ? 'cockpit' : 'table'}.png` });
+    await page.screenshot({ path: `test-results/shots/lights-${ride === 'on' ? 'cockpit' : 'chase'}.png` });
   });
 }
 
@@ -62,7 +62,7 @@ test('race: in the headset without controllers (hand tracking) the student is to
   test.setTimeout(120_000);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  await page.goto('/?test&only=race&auto&fresh&seed=42&ride=off&nocontrollers');
+  await page.goto('/?test&only=race&auto&fresh&seed=42&nocontrollers');
   await expect(page.locator('#enter')).toBeEnabled({ timeout: 100_000 });
   await page.click('#enter');
   await page.waitForFunction(() => document.getElementById('sub')?.textContent.includes('בקרים'), null, { timeout: 60_000 });

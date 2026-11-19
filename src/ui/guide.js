@@ -122,6 +122,6 @@ export function createGuide(ctx) {
 /** The driving controls, as a hint line for the task card. */
 export function driveHint(xr) {
   return xr
-    ? 'הדק ימני: גז · שמאלי: בלם · היגוי: הגה או מוט · X: תצוגה · B: לכביש'
+    ? 'הדק ימני: גז · שמאלי: בלם · היגוי: שתי הידיים כמו הגה · B: לכביש'
     : 'W: גז · S: בלם / רוורס · A / D: היגוי · V: מצלמה · R: לכביש';
 }

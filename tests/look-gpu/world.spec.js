@@ -21,15 +21,4 @@ test('look-gpu: world viewpoints', async ({ page }) => {
   }
   expect(errors).toEqual([]);
 });
-test('look-gpu: RC table view (moving map)', async ({ page }) => {
-  test.setTimeout(300_000);
-  const errors = [];
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto('/?test&world=full&quality=pc&pcstay&fresh&only=race&ride=off&auto&animspeed=1');
-  await expect(page.locator('#enter')).toBeEnabled({ timeout: 120_000 });
-  await page.click('#enter');
-  await page.waitForFunction(() => (window.__ctx.drive?.car?.speed ?? 0) > 8 && window.__ctx.drive.view.mode === 'table', null, { timeout: 200_000 });
-  await page.waitForTimeout(3000);
-  await page.screenshot({ path: `.superpowers/look-gpu/${TAG}-table.png` });
-  expect(errors).toEqual([]);
-});
+

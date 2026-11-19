@@ -181,12 +181,10 @@ async function start(vr) {
   runGame().catch(err => console.error(err));
 }
 
-/** ?fx=drive — drive the race car freely (no chapter). ?ride=off locks the tabletop view, ?ride=on starts in the cockpit; desktop default = chase. */
+/** ?fx=drive — drive the race car freely (no chapter). ?ride=on starts in the cockpit; desktop default = chase. */
 async function driveSandbox() {
-  const forced = params.get('ride') === 'off';
-  ctx.drive = createDriveSession(ctx, { forced });
-  const r = params.get('ride');
-  await ctx.drive.view.setMode(forced ? 'table' : r === 'on' ? 'cockpit' : engine.isXR() ? 'cockpit' : 'chase');
+  ctx.drive = createDriveSession(ctx);
+  await ctx.drive.view.setMode(params.get('ride') === 'on' || engine.isXR() ? 'cockpit' : 'chase');
   ctx.drive.start();
 }
 
@@ -211,7 +209,7 @@ function seedFor(id) {
 function skipFill(id) {
   const rng = makeRng(game.s.seed * 31 + 8);
   if (id === 'race') {
-    game.s.flags.view ??= 'table';
+    game.s.flags.view ??= 'cockpit';
     game.s.reaction ??= { simple: [], falseStarts: 0 };
     if (!game.s.reaction.simple.length) game.s.reaction.simple = [0.28, 0.27, 0.29];
     game.s.reaction.mean ??= game.s.reaction.simple.reduce((a, b) => a + b, 0) / game.s.reaction.simple.length;

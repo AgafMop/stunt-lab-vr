@@ -1,6 +1,6 @@
 // The stunt set: desert ground, braking strip with ruler + gate, director's tower, race track, cars.
 // Placeholder geometry in code with the node-name contract the Blender build will keep (milestone 5):
-//   ST_tower, ST_pit (stations; userData.yaw = facing, yaw 0 looks toward -z), A_board, A_radar, A_clapper, A_table,
+//   ST_tower, ST_pit (stations; userData.yaw = facing, yaw 0 looks toward -z), A_board, A_radar, A_clapper,
 //   STRIP_gate, STRIP_ruler. Coordinates: three.js, metres, y up. Cars: heading 0 faces +z (see carSim.js).
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -20,7 +20,6 @@ export const BUILT = { set: false };      // flip when blender/build_set.py has 
 export const DECK_Y = L.DECK_Y;           // tower deck height (layout: src/world/layout.js)
 export const STRIP = L.STRIP;
 export const TRACK_ORIGIN = new THREE.Vector3(L.TRACK_ORIGIN.x, L.TRACK_ORIGIN.y, L.TRACK_ORIGIN.z);   // where track.js (0,0) sits
-export const TABLE = { scale: 1 / 90, window: 1.0, carZ: 0.5, carScale: 2.0 };   // moving map: ±90 m around the car
 
 const mat = (c, r = 0.85, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 
@@ -53,7 +52,7 @@ export async function loadStuntSet(engine) {
   catcher.rotation.x = -Math.PI / 2; catcher.position.set(-160, 0.003, -315); catcher.receiveShadow = true; catcher.name = 'shadowCatcher';
 
   const root = new THREE.Group(); root.name = 'set';
-  const world = new THREE.Group(); world.name = 'world';            // hidden in the tabletop RC view
+  const world = new THREE.Group(); world.name = 'world';
   root.add(world);
   const anchors = {}, stationNodes = {};
   const empty = (parent, name, [x, y, z], yaw) => {
@@ -67,7 +66,7 @@ export async function loadStuntSet(engine) {
     const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); if (name) o.name = name; parent.add(o); return o;
   };
 
-  // ground: the desert world (terrain + sky stay visible in every view, also the tabletop RC view)
+  // ground: the desert world (terrain + sky)
   try {
     if (lite) throw new Error('light world');
     const terrain = await loadTerrain(engine);
@@ -156,7 +155,6 @@ export async function loadStuntSet(engine) {
   empty(root, 'A_board', [0, DECK_Y + 1.02, -2.6], 0);
   empty(root, 'A_radar', [-0.9, DECK_Y + 1.15, -2.4], 0);
   empty(root, 'A_clapper', [0.35, DECK_Y + 0.65, -1.7]);
-  empty(root, 'A_table', [0, DECK_Y + 0.35, -2.9]);
 
   // ---- race track ----
   const track = buildTrack(TRACK_DEF);
@@ -165,44 +163,6 @@ export async function loadStuntSet(engine) {
   world.add(track3d);
   const st = track.sample(0);
   empty(root, 'ST_pit', [TRACK_ORIGIN.x + st.x + st.tz * 8.5, 0, TRACK_ORIGIN.z + st.z - st.tx * 8.5], 0);   // beside the start line (inside the banner wall), facing the track
-
-  // ---- the RC view's moving map (hidden until that view is on): heading-up, the student's car fixed near the near
-  // edge pointing away from them, the circuit sliding and turning underneath inside a square window on the table ----
-  const table = new THREE.Group(); table.name = 'table'; table.visible = false;
-  anchors.A_table.add(table);
-  mesh(table, new THREE.BoxGeometry(2.4, 0.04, 2.8), mat(0x6b4f36), [0, -0.02, 0], 'tableTop');
-  const sandTop = mesh(table, new THREE.PlaneGeometry(TABLE.window * 2, TABLE.window * 2), mat(0xc5794a, 0.95), [0, 0.002, 0], 'mapSand');
-  sandTop.rotation.x = -Math.PI / 2;
-  const mapRoot = new THREE.Group(); mapRoot.name = 'mapRoot'; table.add(mapRoot);
-  const mini = createTrack3d(track, { full: false });
-  mini.scale.setScalar(TABLE.scale); mini.position.y = 0.005;
-  mapRoot.add(mini);
-  renderer.localClippingEnabled = true;
-  const clip = [];                                                    // world-space window, set once the tower is placed
-  mini.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.clippingPlanes = clip; } });
-  const CAR_AT = new THREE.Vector3(0, 0, TABLE.carZ);
-  const tmpV = new THREE.Vector3();
-  /** Place a model car (child of `mini`) at sim state `car`; for the student's car (`follow`) also move the map. */
-  function placeMini(m, car, follow = m.userData.follow !== false) {
-    m.position.set(car.x, 0, car.z); m.rotation.y = car.heading - (car.slip || 0);
-    if (follow) {
-      mapRoot.rotation.y = Math.PI - car.heading;
-      tmpV.set(car.x * TABLE.scale, 0, car.z * TABLE.scale).applyAxisAngle(THREE.Object3D.DEFAULT_UP, mapRoot.rotation.y);
-      mapRoot.position.copy(CAR_AT).sub(tmpV);
-      if (!clip.length) {
-        table.updateWorldMatrix(true, false);
-        const c = table.localToWorld(new THREE.Vector3()), W = TABLE.window;
-        const q = table.getWorldQuaternion(new THREE.Quaternion());
-        for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const n = new THREE.Vector3(nx, 0, nz).applyQuaternion(q);
-          clip.push(new THREE.Plane(n, -n.dot(c) + W));
-        }
-      }
-    }
-    mapRoot.updateMatrixWorld(true);
-    const w = m.getWorldPosition(tmpV), c = table.getWorldPosition(new THREE.Vector3());
-    m.visible = Math.abs(w.x - c.x) < TABLE.window && Math.abs(w.z - c.z) < TABLE.window;
-  }
 
   // reflections of THIS sky (sunset gold, violet zenith) instead of a grey studio: car paint, glass, the wet corner
   const dome = root.getObjectByName('sky');
@@ -219,7 +179,7 @@ export async function loadStuntSet(engine) {
   root.traverse(o => { if (o.isMesh && o.material.isMeshStandardMaterial) { o.material.envMap = env; o.material.envMapIntensity = o.name === 'trackAsphalt' ? 0.7 : 0.45; } });
 
   return {
-    root, world, tower, anchors, stationNodes, discs: {}, env, track, track3d, table, mini, placeMini, TABLE, focusShadow, sun,
+    root, world, tower, anchors, stationNodes, discs: {}, env, track, track3d, focusShadow, sun,
     strip: {
       gate, ruler,
       rulerZero: new THREE.Vector3(STRIP.gateX, 0, STRIP.z),
@@ -280,7 +240,7 @@ export function makeCar(color = 0xf07a1a, { lod = false, lo = false } = {}) {
   if (CAR_MODEL) {
     const paint = paintMaterial(color), wheels = [];
     // lod: an opponent — THREE.LOD shows the full car near the viewer and the light one beyond CAR_LOD_DIST
-    // lo: always the light car (the table's moving-map models)
+    // lo: always the light car (headset rivals)
     const m = lo && CAR_LO ? CAR_LO.clone(true) : lod && CAR_LO ? new THREE.LOD() : CAR_MODEL.clone(true);
     if (m.isLOD) { m.addLevel(CAR_MODEL.clone(true), 0); m.addLevel(CAR_LO.clone(true), CAR_LOD_DIST); }
     m.traverse(o => {

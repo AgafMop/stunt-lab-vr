@@ -1,11 +1,12 @@
 // Chapter 1 — the qualifying race (spec §6 ch. 1, spike version):
-//   1. view choice: in the car (cockpit) or remote control from the tower (tabletop model); ?ride=off forces the table
+//   1. into the car: the headset drives from the driver's seat (the tower's remote-control table was removed after the
+//      2026-11-19 headset check), first a steering check — turn the hands right, then left, the gloves on the wheel follow
 //   2. start-light drill × START_DRILLS: the student's real simple reaction time; a press before lights-out, or a
 //      trigger already held at lights-out, is a false start and does not count
 //   3. one lap against Bumper and four more drivers — all real cars, solid against each other (raceField.js); rushing the
 //      wet corner ends in the sand (inertia + friction teaser)
 import * as THREE from 'three';
-import { boardAtStation, row } from './kit.js';
+import { boardAtStation } from './kit.js';
 import { createDriveSession } from '../core/driveSession.js';
 import { assistInput } from '../game/assist.js';
 import { classifyStart, makeRng } from '../game/model.js';
@@ -21,7 +22,6 @@ export async function run(ctx, scope) {
   await ctx.loco.goTo('tower');
   const ride = params.get('ride');
   const drive = createDriveSession(ctx, {
-    forced: ride === 'off',
     timeScale: ctx.auto ? ctx.animSpeed : 1, maxSub: ctx.auto ? 400 : 30,
   });
   ctx.drive = drive;
@@ -32,26 +32,9 @@ export async function run(ctx, scope) {
     ctx.loco.lock(false);
   });
 
-  // ---- 1. view choice ----
-  // desktop: straight into the racing-game chase view (V switches to the driver's seat); headset: the student chooses
-  let view = ride === 'off' ? 'table' : ride === 'on' ? 'cockpit' : ride === 'chase' ? 'chase' : engine.isXR() ? null : 'chase';
-  if (!view) {
-    const g = boardAtStation(ctx, scope, 'tower', { dist: 1.0, height: 1.3 }); g.name = 'viewChoice';
-    let pick; const chosen = new Promise(res => { pick = res; });
-    const cards = [['cockpit', 'בתוך הרכב', ICON_CAR], ['table', 'שלט רחוק מהמגדל', ICON_TABLE]].map(([id, label, icon]) => scope.add(ui.card({
-      w: 0.32, h: 0.36, label, icon, name: 'view', viewDist: 1.0,
-      onSelect: c => { ctx.audio.sfx('click'); for (const x of cards) x.setState(x === c ? 'sel' : 'off'); pick(id); },
-    })));
-    row(g, cards);
-    const glowOffs = cards.map(c => ctx.attention?.(c.mesh) ?? (() => {}));
-    scope.add(() => glowOffs.forEach(f => f()));
-    ctx.task?.set('race_choose');
-    scope.say('race_choose');
-    if (ctx.auto) setTimeout(() => ctx.input.select(cards[0].mesh), 300);
-    view = await scope.guard(chosen);
-    glowOffs.forEach(f => f());
-    g.visible = false;
-  }
+  // ---- 1. into the car ----
+  // desktop: the racing-game chase view (V switches to the driver's seat); headset: always the driver's seat
+  const view = engine.isXR() || ride === 'on' ? 'cockpit' : 'chase';
   game.s.flags.view = view;
   const slot = gridSlot(PLAYER_SLOT);
   drive.placeAt(slot.s, slot.u);                      // 4th on the grid: slower cars ahead to pass, faster ones behind
@@ -63,13 +46,10 @@ export async function run(ctx, scope) {
     const car3d = scope.add(ctx.lab.makeCar(r.color, engine.isXR() ? { lo: true } : { lod: true })); car3d.name = `rival_${r.id}`;
     car3d.traverse(o => { if (o.isMesh) o.castShadow = false; });     // the cockpit lap stays inside the triangle budget
     ctx.lab.world.add(car3d);
-    const mini = scope.add(ctx.lab.makeCar(r.color, { lo: true })); mini.scale.setScalar(ctx.lab.TABLE.carScale); mini.userData.follow = false;
-    ctx.lab.mini.add(mini);
-    return { r, car3d, mini };
+    return { r, car3d };
   });
-  const placeRivals = () => { for (const { r, car3d, mini } of rivals) {
+  const placeRivals = () => { for (const { r, car3d } of rivals) {
     car3d.position.set(ctx.lab.track3d.position.x + r.car.x, 0, ctx.lab.track3d.position.z + r.car.z); car3d.rotation.y = r.car.heading - (r.car.slip || 0);
-    ctx.lab.placeMini(mini, r.car, false);
   } };
   placeRivals();
   scope.add(engine.onFrame(placeRivals));
@@ -77,6 +57,7 @@ export async function run(ctx, scope) {
   ctx.field = field;
   await scope.guard(drive.view.setMode(view));
   drive.start();
+  if (engine.isXR() && !ctx.auto) await steerCheck(ctx, scope, drive);
 
   // ---- 2. start-light drill ----
   const lights = scope.add(gantry());
@@ -93,8 +74,7 @@ export async function run(ctx, scope) {
   }
   const placeLights = () => {
     if (drive.view.mode === 'cockpit') { drive.car3d.add(lights); lights.position.set(0, 1.75, 4.5); lights.rotation.set(0, Math.PI, 0); lights.scale.setScalar(1.6); }
-    else if (drive.view.mode === 'chase') { drive.car3d.add(lights); lights.position.set(0, 4.2, 18); lights.rotation.set(0, Math.PI, 0); lights.scale.setScalar(3.2); }   // a start gantry over the road
-    else { ctx.lab.anchors.A_table.add(lights); lights.position.set(0, 0.62, -1.5); lights.rotation.set(0, 0, 0); lights.scale.setScalar(1.5); }   // far edge of the table, just under eye level
+    else { drive.car3d.add(lights); lights.position.set(0, 4.2, 18); lights.rotation.set(0, Math.PI, 0); lights.scale.setScalar(3.2); }   // chase: a start gantry over the road
   };
   placeLights();
   const lightsVis = () => { lights.visible = drillOn && !(hudL && drive.view.mode === 'chase'); };
@@ -161,9 +141,11 @@ export async function run(ctx, scope) {
     const ok = scope.add(ui.button3d('הבנתי! להקפה', () => {}, { w: 0.34, h: 0.09, viewDist: 1.05 }));
     ok.mesh.position.set(0, -0.29, 0.01); g.add(ok.mesh);
     ctx.task?.set('race_reaction');
+    ctx.input.setRaysOnHit?.(false);                                  // a button to click: the rays are back
     await scope.say('race_reaction1');
     await scope.say('race_reaction2');
     await scope.waitSelect(ok.mesh);
+    ctx.input.setRaysOnHit?.(drive.view.mode === 'cockpit');
     g.visible = false;
   }
 
@@ -195,9 +177,10 @@ export async function run(ctx, scope) {
     if (progress >= field.playerFinish - 3) done = true;
   });
   scope.add(offStep);
-  // steering help (assist.js): the student always steers; 'light' blends in a share of the racing line (headset
-  // default — thumbstick / wheel), 'off' on desktop. ?assist=off|light overrides. It never brakes for the student.
-  const assist = params.get('assist') ?? (engine.isXR() ? 'light' : 'off');
+  // steering help (assist.js): off by default — keys and the headset's hand wheel both get the arcade heading hold
+  // (keyAlign in driveSession: let go and the car settles along the road), and the hands must feel in charge.
+  // ?assist=light blends in a share of the racing line. It never brakes for the student.
+  const assist = params.get('assist') ?? 'off';
   game.s.flags.assist = assist;
   const autoPace = speedProfile(track, { margin: 0.7 });
   const autoMe = { car: drive.car, lane: slot.u, paceFn: autoPace };     // ?auto: drives like a rival (passes, never rams)
@@ -288,14 +271,21 @@ function drawTimes(ui, c, W, H, list) {
   ui.fitText(c, txt, { x: 20, y: 8, w: W - 40, h: H - 16, maxPx: H * 0.55, minPx: ui.minPx(900, 2), font: ui.FONT });
 }
 
-const ICON_CAR = (g, x, y, w, h) => {
-  const cx = x + w / 2, cy = y + h * 0.55, r = Math.min(w, h) * 0.36;
-  g.strokeStyle = '#EEF2F8'; g.lineWidth = 14; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
-  g.beginPath(); g.moveTo(cx - r, cy); g.lineTo(cx + r, cy); g.moveTo(cx, cy); g.lineTo(cx, cy + r); g.stroke();
-};
-const ICON_TABLE = (g, x, y, w, h) => {
-  g.strokeStyle = '#3CC4BC'; g.lineWidth = 12;
-  g.beginPath(); g.ellipse(x + w / 2, y + h * 0.5, w * 0.34, h * 0.22, 0, 0, 7); g.stroke();
-  g.fillStyle = '#E8643A'; g.fillRect(x + w * 0.62, y + h * 0.3, w * 0.1, h * 0.07);
-  g.strokeStyle = '#EEF2F8'; g.lineWidth = 8; g.beginPath(); g.moveTo(x + w * 0.15, y + h * 0.85); g.lineTo(x + w * 0.85, y + h * 0.85); g.stroke();
-};
+/** Headset, before the lights: turn the hands right, then left. The car is parked; the gloves on the wheel turn with
+ *  the real hands, so the student learns the wheel before it matters. Moves on after 25 s anyway (never blocks). */
+async function steerCheck(ctx, scope, drive) {
+  for (const [dir, line] of [[1, 'race_steer_r'], [-1, 'race_steer_l']]) {
+    ctx.task?.set(line);
+    const said = scope.say(line);
+    await scope.guard(new Promise(res => {
+      const t0 = performance.now(); let held = 0, last = t0;
+      const off = ctx.engine.onFrame(() => {
+        const now = performance.now(), dt = (now - last) / 1000; last = now;
+        held = dir * drive.steerIn > 0.35 ? held + dt : 0;
+        if (held > 0.3 || now - t0 > 25_000) { off(); if (held > 0.3) ctx.audio.sfx('ok'); res(); }
+      });
+      scope.add(off);
+    }));
+    await said;
+  }
+}

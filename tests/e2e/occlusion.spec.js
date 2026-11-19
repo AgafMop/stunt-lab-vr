@@ -1,9 +1,8 @@
-// Every button the student must click is visible: from the chase camera, in the car (cockpit) and from the tower
-// (table). The audit in kit.waitSelect (?test) logs a console error when a target is hidden behind the world or off
+// Every button the student must click is visible: from the chase camera and in the car (cockpit). The audit in kit.waitSelect (?test) logs a console error when a target is hidden behind the world or off
 // screen — the user once got stuck in the cockpit behind the dashboard.
 import { test, expect } from '@playwright/test';
-for (const ride of ['chase', 'on', 'off']) {
-  test(`occlusion: race buttons visible (${ride === 'on' ? 'cockpit' : ride === 'off' ? 'table' : 'chase'})`, async ({ page }) => {
+for (const ride of ['chase', 'on']) {
+  test(`occlusion: race buttons visible (${ride === 'on' ? 'cockpit' : 'chase'})`, async ({ page }) => {
     test.setTimeout(400_000);
     const errors = [];
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });

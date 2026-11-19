@@ -49,12 +49,3 @@ test('drive sandbox: both views, toggle, no errors', async ({ page }) => {
   await page.screenshot({ path: `${SHOTS}/chase.png` });
   expect(errors).toEqual([]);
 });
-
-test('drive sandbox: ?ride=off forces the tabletop view and V cannot switch it', async ({ page }) => {
-  const errors = await boot(page, '&fx=drive&ride=off');
-  expect(await page.evaluate(() => window.__ctx.drive.view.mode)).toBe('table');
-  await page.keyboard.press('KeyV');
-  await page.waitForTimeout(600);
-  expect(await page.evaluate(() => window.__ctx.drive.view.mode)).toBe('table');
-  expect(errors).toEqual([]);
-});

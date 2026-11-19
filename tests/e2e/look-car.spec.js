@@ -16,11 +16,9 @@ test('look: car, cockpit and race track (screenshots)', async ({ page }) => {
   await page.evaluate(async () => {
     const { lab, loco, engine } = window.__ctx;
     const c = lab.makeCar(0xf07a1a); c.position.set(10, 0, -14); c.rotation.y = 2.3; lab.world.add(c);
-    window.__ctx.drive.view.setMode('table');
+    window.__ctx.drive.view.dispose(); await loco.goTo('tower', { fade: false });
   });
-  await page.waitForFunction(() => window.__ctx.drive.view.mode === 'table' && window.__ctx.engine.fadeLevel() < 0.05, null, { timeout: 60_000 });
-  await page.screenshot({ path: '.superpowers/look/car-table.png' });
-  await page.evaluate(() => { const { lab } = window.__ctx; lab.world.visible = true; lab.table.visible = false; window.__ctx.loco.look(0.0, -0.5); });
+  await page.evaluate(() => window.__ctx.loco.look(0.0, -0.5));
   await page.waitForTimeout(1500);
   await page.screenshot({ path: '.superpowers/look/car-outside.png' });
   // the track from the pit (corner 1 with kerbs and tyres)

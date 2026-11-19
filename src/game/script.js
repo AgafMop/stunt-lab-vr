@@ -24,7 +24,8 @@ export const LINES = {
   intro_chair: d('אתם היועצים החדשים? הכיסא שלכם. קודם, מבחן קבלה.'),
 
   // race (chapter 1)
-  race_choose: b('איך נוהגים היום? מתוך הרכב, או בשלט מהמגדל?'),
+  race_steer_r: b('תחזיקו את שני הבקרים כמו הגה, ידיים ישרות. עכשיו סובבו ימינה!'),
+  race_steer_l: b('יופי! ועכשיו שמאלה.'),
   race_controllers: b('כדי לנהוג צריך את הבקרים. הרימו אותם, אחד בכל יד.'),
   race_lights: b('חמישה אורות אדומים. כשכולם כבים — גז!', 'חמישה אורות אדומים. כְּשֶׁכּוּלָּם כָּבִים — גַּז!'),
   race_falsestart: b('זינוק מוקדם! תגובה לפני האות היא ניחוש, לא זמן תגובה.'),
@@ -145,7 +146,8 @@ export const LINES = {
 
 // "המשימה עכשיו" — one short line per waiting moment (src/ui/guide.js). `drive: true` adds the controls hint.
 export const TASKS = {
-  race_choose: { text: 'בחרו איך לנהוג: בתוך הרכב, או בשלט רחוק מהמגדל' },
+  race_steer_r: { text: 'החזיקו את שני הבקרים כמו הגה, וסובבו ימינה', drive: true },
+  race_steer_l: { text: 'יופי! עכשיו סובבו שמאלה', drive: true },
   race_controllers: { text: 'הרימו את שני הבקרים, אחד בכל יד' },
   race_drill: { text: 'תרגיל זינוק: חכו שכל חמשת האורות ייכבו, ואז גז!', drive: true },
   race_reaction: { text: 'קראו מה המשמעות של זמן התגובה, ולחצו "הבנתי"' },

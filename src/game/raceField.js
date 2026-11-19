@@ -15,13 +15,16 @@ import { resolveCars } from './carCollide.js';
 export const GRID = { first: -7, gap: 4.6, lane: 2.6 };
 export const PLAYER_SLOT = 3;
 export const LANE_MAX = 3.6;                    // |offset| a rival aims for on the 11 m road (barriers stay clear)
-// slowest at the front, fastest at the back; bumper keeps his old pace (config GHOST: ≈ 101 s)
+// slowest at the front, fastest at the back; bumper drives config GHOST (≈ 94 s)
 export const RIVALS = [
-  { id: 'violet', color: 0x8a4fd1, pace: { margin: 0.56, vMax: 21.5, accel: 3.4, decel: 5 }, react: 0.42, lane: 1.2 },
-  { id: 'blue',   color: 0x2f6fd6, pace: { margin: 0.6, vMax: 22.5, accel: 3.6, decel: 5 }, react: 0.35, lane: -1.4 },
+  // 2026-11-19 headset check: "the rivals are too easy to beat" — faster corners and harder braking for everyone (a lap
+  // of ≈ 90–97 s in the field, was 97–112; a clean student lap is ≈ 86–90 s). vMax above the car's top speed (26 m/s)
+  // only keeps the gas down on the straights.
+  { id: 'violet', color: 0x8a4fd1, pace: { margin: 0.8, vMax: 27, accel: 4.6, decel: 5.8 }, react: 0.42, lane: 1.2 },
+  { id: 'blue',   color: 0x2f6fd6, pace: { margin: 0.88, vMax: 28.5, accel: 5, decel: 6 }, react: 0.35, lane: -1.4 },
   { id: 'bumper', color: 0x3cc4bc, pace: null, react: 0.3, lane: 0.6 },
-  { id: 'yellow', color: 0xf2c12e, pace: { margin: 0.78, vMax: 25, accel: 4.3, decel: 5.4 }, react: 0.32, lane: -0.8 },
-  { id: 'red',    color: 0xd9342b, pace: { margin: 0.86, vMax: 26, accel: 4.8, decel: 5.8 }, react: 0.28, lane: 1.6 },
+  { id: 'yellow', color: 0xf2c12e, pace: { margin: 1.04, vMax: 32, accel: 5.8, decel: 6.4 }, react: 0.32, lane: -0.8 },
+  { id: 'red',    color: 0xd9342b, pace: { margin: 1.12, vMax: 34, accel: 6.2, decel: 6.8 }, react: 0.28, lane: 1.6 },
 ];
 
 /** Grid slot k (0 = pole): track position s (m, negative = behind the line) and offset u (m, + = left). */
@@ -86,9 +89,9 @@ export function createField(track, walls, { ghostPace, rivals = RIVALS, playerSl
     return near.dist > half ? 'sand' : near.s >= w0 && near.s <= w1 ? 'wet' : 'dry';
   }
 
-  function rescue(me, all) {
+  function rescue(me, all, ahead = false) {
     const s = me.car.near.s;
-    for (const back of [0, -15, -30, 15]) {
+    for (const back of ahead ? [20, 30, 45] : [0, -15, -30, 15]) {
       const ss = s + back;
       if (all.every(o => o.car === me.car || Math.hypot(o.car.x - track.sample(ss).x, o.car.z - track.sample(ss).z) > 12)) {
         placeOnTrack(track, me.car, ss, 0); me.car.speed = 6; me.lane = 0; me.stuck = 0; me.rescues++; return;
@@ -117,6 +120,9 @@ export function createField(track, walls, { ghostPace, rivals = RIVALS, playerSl
         collide(c, track, walls, near);
         me.stuck = surface === 'sand' && Math.abs(c.speed) < 1.2 && go ? me.stuck + h : 0;
         if ((me.stuck > 3 || near.dist > 20) && go) rescue(me, all);
+        // wedged on the road (a student parked across its line, the faster field has no room to pass): ahead of it
+        me.stall = go && t - goT > 3 && Math.abs(c.speed) < 1 ? (me.stall ?? 0) + h : 0;
+        if (me.stall > 4) { rescue(me, all, true); me.stall = 0; }
         const ns = c.near.s, ds = wrap(ns - me.lastS, L);
         if (Math.abs(ds) < 20) me.progress += ds;
         me.lastS = ns;

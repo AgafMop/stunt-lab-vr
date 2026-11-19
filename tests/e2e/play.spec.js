@@ -47,9 +47,9 @@ test('tour: screenshot every board', async ({ page }) => {
 });
 
 test('full game plays itself to the end within budget, text fits, nothing jumps', async ({ page }) => {
-  test.setTimeout(330_000);
+  test.setTimeout(590_000);                    // + the cliff chapter (2026-11-19): ≈ 6–7 min on software GL
   const errors = await boot(page, '&auto&fresh&seed=42');
-  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 320_000 });
+  await page.waitForFunction(() => window.__gameDone === true, null, { timeout: 570_000 });
   await page.screenshot({ path: `${SHOTS}/end.png` });
   expect(await textProblems(page)).toEqual([]);
   expect(await page.evaluate(() => window.__ctx.motionAudit)).toEqual([]);
@@ -60,7 +60,8 @@ test('full game plays itself to the end within budget, text fits, nothing jumps'
   }
   const s = await page.evaluate(() => window.__ctx.game.s);
   expect(budget).toHaveProperty('race');      // 'end' finishes before the 1.5 s budget sample in ?auto
-  for (const ch of ['strip', 'belt', 'plan', 'graph', 'surfaces', 'stunt']) expect(budget).toHaveProperty(ch);
+  for (const ch of ['cliff', 'strip', 'belt', 'plan', 'graph', 'surfaces', 'stunt']) expect(budget).toHaveProperty(ch);
+  expect(s.cliffTest.verdict).toBe('cliff');                                // ?auto brakes late by eye
   expect(s.reaction.simple).toHaveLength(3);
   expect(s.flags.lapDone).toBe(true);
   expect(Object.values(s.trials).flat()).toHaveLength(15);                  // 5 speeds × 3

@@ -11,9 +11,10 @@ const IWER = fs.readFileSync(path.resolve('node_modules/iwer/build/iwer.min.js')
 const SHOTS = '.superpowers/xr-overlap';
 const CHAPTERS = ['intro', 'race', 'cliff', 'belt', 'plan', 'strip', 'graph', 'surfaces', 'stunt', 'road', 'end'];
 // + a student who stood (eye 1.65) with the head turned to read the task card (50° left) and past it (75°)
-const RUNS = [...CHAPTERS.map(ch => ({ ch, tag: ch })), { ch: 'plan', tag: 'plan-turned50', yaw: 50, eyeY: 1.65 }, { ch: 'graph', tag: 'graph-turned75', yaw: 75, eyeY: 1.65 }];
+const RUNS = [...CHAPTERS.map(ch => ({ ch, tag: ch })), { ch: 'plan', tag: 'plan-turned50', yaw: 50, eyeY: 1.65 }, { ch: 'graph', tag: 'graph-turned75', yaw: 75, eyeY: 1.65 },
+  { ch: 'stunt', tag: 'stunt-retry', q: '&stuntpress=late' }];   // the retry screen: the last take's card over the lamp choice
 
-for (const { ch, tag, yaw = 0, eyeY = 1.2 } of RUNS) {
+for (const { ch, tag, yaw = 0, eyeY = 1.2, q = '' } of RUNS) {
   test(`xr overlap: ${tag}`, async ({ page }) => {
     test.setTimeout(600_000);
     fs.mkdirSync(SHOTS, { recursive: true });
@@ -24,7 +25,7 @@ for (const { ch, tag, yaw = 0, eyeY = 1.2 } of RUNS) {
       window.__xrd.installRuntime({ forceInstall: true });
       window.__xrd.stereoEnabled = false;
       window.__xrd.position.set(0, ${eyeY}, 0);` });
-    await page.goto(`/?test&auto&fresh&seed=42&only=${ch}${ch === 'intro' ? '&film' : ''}`);
+    await page.goto(`/?test&auto&fresh&seed=42&only=${ch}${ch === 'intro' ? '&film' : ''}${q}`);
     await page.click('#enterVR');
     await page.waitForFunction(() => window.__ctx?.engine.isXR(), null, { timeout: 60_000 });
     if (yaw) {                                                    // turn the head left once the chapter has begun

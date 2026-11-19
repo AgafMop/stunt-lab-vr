@@ -153,7 +153,7 @@ export async function loadStuntSet(engine) {
   } catch (e) { console.warn('set.glb unavailable, placeholder tower', e); }
   empty(root, 'ST_tower', [0, DECK_Y, -1.4], 0).userData.pitch = -0.42;   // desktop: look down at the strip
   empty(root, 'A_board', [0, DECK_Y + 1.02, -2.6], 0);
-  empty(root, 'A_radar', [-0.9, DECK_Y + 1.15, -2.4], 0);
+  empty(root, 'A_radar', [-0.9, DECK_Y + 0.93, -2.4], 0);         // under the task card (9° up, 44° left)
   empty(root, 'A_clapper', [0.35, DECK_Y + 0.65, -1.7]);
 
   // ---- race track ----

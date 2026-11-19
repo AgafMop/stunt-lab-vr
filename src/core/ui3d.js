@@ -152,9 +152,9 @@ export function createUI(engine, input, { audit = false } = {}) {
 
   // ---- subtitles: DOM on desktop; in XR a fixed ZONE, never over the boards, cards and task card (2026-11-19 headset
   // check: "text boxes cover each other in many places" — the old panel rode 12° below the gaze, over every board):
-  //   free (the tower): a band 21° above the horizon, over the boards (they open at and below eye level, the notebook's
+  //   free (the tower): a band 22° above the horizon, over the boards (they open at and below eye level, the notebook's
   //     top ≈ 11°) in the sky; it turns with the head only when the head turns > 45° away, and then stays above the
-  //     task card (5° up, 40° left: its top ≈ 11°, the band's bottom ≈ 16°)
+  //     task card (9° up, 44° left: its top ≈ 15°, the band's bottom ≈ 17°)
   //   docked: a place on an object — the car (upper windshield, over the road, clear of the dash, the HUD, the task card
   //     and the start lights) or the film screen (under the picture)
   const subEl = document.getElementById('sub');
@@ -167,7 +167,7 @@ export function createUI(engine, input, { audit = false } = {}) {
   } });
   subPanel.mesh.renderOrder = 9000; subPanel.mesh.visible = false; subPanel.mesh.userData.ui = true; scene.add(subPanel.mesh);
   subPanel.mesh.userData.auditHidden = true;                          // the audit counts it even between lines: any line may show here
-  const SUB = { dist: 1.4, pitch: 21 * Math.PI / 180, freeScale: 0.9, carPitch: 26 * Math.PI / 180, follow: 45 * Math.PI / 180 };
+  const SUB = { dist: 1.4, pitch: 22 * Math.PI / 180, freeScale: 0.9, carPitch: 26 * Math.PI / 180, follow: 45 * Math.PI / 180 };
   let subTimer = 0, dock = null, snap = true, subYaw = 0, turning = false;
   const target = new THREE.Vector3(), q = new THREE.Quaternion(), head = new THREE.Vector3(), fwd = new THREE.Vector3();
   engine.onFrame(dt => {

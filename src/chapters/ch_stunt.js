@@ -108,9 +108,9 @@ function showTake(ctx, scope, g, t, tr) {
   const f = n => `⁦${Math.abs(n).toFixed(1)}⁩`;
   const where = t.verdict === 'cliff' ? 'הטייק הקודם: לקניון' : t.stop > 0 ? `הטייק הקודם: ${f(t.stop)} מ׳ אחרי הקו` : `הטייק הקודם: ${f(t.stop)} מ׳ לפני הקו`;
   const react = t.early ? 'בלמתם לפני שהפנס נדלק' : t.reaction == null ? 'לא בלמתם' : `זמן התגובה בטייק: ⁦${t.reaction.toFixed(2)}⁩ ש׳ (במרוץ: ⁦${tr.toFixed(2)}⁩ ש׳)`;
-  const p = scope.add(ui.panel({ w: 0.8, h: 0.17, name: 'stuntTake', viewDist: 2.6, draw(c, W, H) {
+  const p = scope.add(ui.panel({ w: 0.8, h: 0.17, name: 'stuntTake', viewDist: 1.2, draw(c, W, H) {
     ui.rr(c, 4, 4, W - 8, H - 8, 22); c.fillStyle = ui.C.bg; c.fill(); c.lineWidth = 4; c.strokeStyle = '#FFB347'; c.stroke();
-    const mp = ui.minPx(900, 2.6);
+    const mp = ui.minPx(900, 1.2);              // A_board is 1.2 m from the chair
     c.fillStyle = ui.C.ink; ui.fitText(c, where, { x: 24, y: 8, w: W - 48, h: H * 0.46, maxPx: H * 0.36, minPx: mp, font: ui.FONT, weight: 800 });
     c.fillStyle = '#9FB0C8'; ui.fitText(c, react, { x: 24, y: H * 0.52, w: W - 48, h: H * 0.4, maxPx: H * 0.28, minPx: mp, font: ui.FONT, weight: 600 });
   } }));

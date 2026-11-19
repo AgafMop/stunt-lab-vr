@@ -61,7 +61,8 @@ export function createGuide(ctx) {
     if (hint) {
       c.fillStyle = '#9FB0C8';
       const parts = hint.split(' · '), half = Math.ceil(parts.length / 2);
-      [parts.slice(0, half).join(' · '), parts.slice(half).join(' · ')].forEach((ln, i) =>
+      const lines = hint.includes(' | ') ? hint.split(' | ') : [parts.slice(0, half).join(' · '), parts.slice(half).join(' · ')];
+      lines.forEach((ln, i) =>
         ui.fitText(c, ln, { x: 24, y: H * (0.7 + i * 0.145), w: W - 48, h: H * 0.14, maxPx: H * 0.12, minPx: ui.minPx(900, 1.1), font: ui.FONT, weight: 500, align: 'right' }));
     }
   } });
@@ -70,7 +71,7 @@ export function createGuide(ctx) {
   // ≈ 40° left of the seated student's straight-ahead, ≈ 10° above the eyes, 1.25 m: it covers only sky (the strip, the
   // number signs and the far track are below the horizon) and stays clear of the boards that open straight ahead —
   // they span up to ≈ 25° left (at 30° it covered the view-choice card in the headset, 2026-11-18). Faces the chair.
-  towerHome.position.set(-0.79, 6 + 1.28, -2.34);              // 5° up (2026-11-19: its top stays under the subtitles' 21° band)
+  towerHome.position.set(-0.85, 6 + 1.365, -2.29);             // 9° up, 44° left (2026-11-19: over the answer cards, its top (15°) under the subtitles' band (from 17°), clear of the notebook at the centre)
   ctx.lab.root.add(towerHome);
   towerHome.lookAt(0, 6 + 1.17, -1.4);
   // on the face of the dashboard, right of the steering wheel, BELOW the driver's line of sight over the dash (every corner of the
@@ -120,7 +121,7 @@ export function createGuide(ctx) {
     /** Set the current task by id (TASKS in script.js); null hides it. */
     set(id) {
       const t = id ? TASKS[id] : null;
-      text = t?.text || ''; hint = t?.drive ? driveHint(true, t.skip) : ''; domHint = t?.drive ? driveHint(isXR(), t.skip) : '';
+      text = t?.text || ''; hint = t?.drive ? driveHint(true, t.skip) : ''; domHint = t?.drive ? driveHint(isXR(), t.skip).replace(' | ', ' · ') : '';
       panel.redraw();
       if (dom) { dom.replaceChildren(); if (text) { const b = document.createElement('b'); b.textContent = 'המשימה עכשיו'; const p = document.createElement('div'); p.textContent = text; dom.append(b, p); if (domHint) { const s = document.createElement('small'); s.textContent = domHint; dom.append(s); } } }
       if (id) ctx.taskLog?.push(id);
@@ -135,6 +136,7 @@ export function createGuide(ctx) {
 /** The driving controls, as a hint line for the task card. */
 export function driveHint(xr, skip = false) {
   return xr
-    ? `הדק ימני: גז · שמאלי: בלם · היגוי: שתי הידיים כמו הגה · B: לכביש${skip ? ' · Y ארוך: דילוג' : ''}`
+    ? (skip ? 'הדק ימני: גז · שמאלי: בלם · B: לכביש | היגוי: שתי הידיים כמו הגה · Y ארוך: דילוג'    // ' | ' = the line break
+      : 'הדק ימני: גז · שמאלי: בלם · היגוי: שתי הידיים כמו הגה · B: לכביש')
     : 'W: גז · S: בלם / רוורס · A / D: היגוי · V: מצלמה · R: לכביש';
 }

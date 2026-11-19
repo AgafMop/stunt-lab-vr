@@ -254,3 +254,22 @@ test('xr: the race cockpit within the Quest budget (full world, five rivals on t
   expect(b.calls).toBeLessThanOrEqual(150);
   expect(b.tris).toBeLessThanOrEqual(400_000);
 });
+
+// Round 4: the student drives the strip car in the rain (the big shot), Roni beside them, the line gantry ahead.
+test('xr: the big shot cockpit (rain, Roni, the gantry) within the Quest budget', async ({ page }) => {
+  test.setTimeout(300_000);
+  await headset(page, { eyeY: 1.2 });
+  await page.goto('/?test&fresh&seed=42&only=stunt&world=full&auto&animspeed=1');
+  await page.click('#enterVR');
+  await page.waitForFunction(() => window.__ctx?.cliffState && window.__ctx.engine.fadeLevel() < 0.05, null, { timeout: 280_000 });
+  await page.waitForTimeout(1000);
+  const b = await page.evaluate(() => new Promise(res => {
+    const e = window.__ctx.engine, i = e.renderer.info.render;
+    const off = e.onAfterRender(() => { off(); const n = e.renderer.xr.getCamera().cameras.length;
+      res({ eyes: n, calls: Math.round(i.calls / n), tris: Math.round(i.triangles / n) }); });
+  }));
+  console.log('BUDGET xr stunt-cockpit', JSON.stringify(b));
+  await page.screenshot({ path: `${SHOTS}/budget-stunt-cockpit.png` });
+  expect(b.calls).toBeLessThanOrEqual(150);
+  expect(b.tris).toBeLessThanOrEqual(400_000);
+});
